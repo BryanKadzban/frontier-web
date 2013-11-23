@@ -234,7 +234,7 @@
 				indexbuf.length = indices.length;
 
 				var model = mat4.create();
-				//mat4.translate(model, model, vec3.fromValues(0, 0, -1.5));
+				mat4.rotateX(model, model, -Math.PI / 2);
 				var modelarr = [];
 				// copy the nth column of model for each vertex, into each of n new Float32Arrays
 				// model is really a Float32Array, in column-major order; exploit that

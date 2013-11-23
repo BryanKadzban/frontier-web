@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<script src="gl-matrix-min.js"></script>
+		<script>
+			var gl;
+			var buffers;  // vertex, color, model0, model1, model2, model3
+			var attributes;  // [pos, color, model0, model1, model2, model3], [proj, view]
+			var textures;  // [tree]
+			var vm, pm;
+
+			function getShader(gl, id) {
+				var shaderScript = document.getElementById(id);
+				var shader = null;
+
+				if (!shaderScript) return null;
+
+				if (shaderScript.type == 'x-shader/x-fragment') {
+					shader = gl.createShader(gl.FRAGMENT_SHADER);
+				} else if (shaderScript.type == 'x-shader/x-vertex') {
+					shader = gl.createShader(gl.VERTEX_SHADER);
+				} else {
+					return null;
+				}
+
+				var currentChild = shaderScript.firstChild;
+				var source = "";
+
+				while (currentChild) {
+					if (currentChild.nodeType == currentChild.TEXT_NODE) {
+						source += currentChild.textContent;
+					}
+					currentChild = currentChild.nextSibling;
+				}
+
+				gl.shaderSource(shader, source);
+				gl.compileShader(shader);
+
+				if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+					alert('Error compiling shaders: ' + gl.getShaderInfoLog(shader));
+					return null;
+				}
+
+				return shader;
+			}
+
+			// Returns a list of lists; first list is the attribute locations,
+			// second list is the uniform locations
+			function initShaders(gl) {
+				var frag = getShader(gl, "frag-shader");
+				var vert = getShader(gl, "vert-shader");
+
+				var prog = gl.createProgram();
+				gl.attachShader(prog, vert);
+				gl.attachShader(prog, frag);
+				gl.linkProgram(prog);
+
+				if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+					alert('Link failed: ' + gl.getProgramInfoLog(prog));
+				}
+
+				gl.useProgram(prog);
+
+				var posAttr = gl.getAttribLocation(prog, 'pos');
+				gl.enableVertexAttribArray(posAttr);
+
+				var colAttr = gl.getAttribLocation(prog, 'color');
+				gl.enableVertexAttribArray(colAttr);
+
+				var uvAttr = gl.getAttribLocation(prog, 'uv');
+				gl.enableVertexAttribArray(uvAttr);
+
+				var modelAttr0 = gl.getAttribLocation(prog, 'model0');
+				gl.enableVertexAttribArray(modelAttr0);
+				var modelAttr1 = gl.getAttribLocation(prog, 'model1');
+				gl.enableVertexAttribArray(modelAttr1);
+				var modelAttr2 = gl.getAttribLocation(prog, 'model2');
+				gl.enableVertexAttribArray(modelAttr2);
+				var modelAttr3 = gl.getAttribLocation(prog, 'model3');
+				gl.enableVertexAttribArray(modelAttr3);
+
+				var proj = gl.getUniformLocation(prog, 'proj');
+				var view = gl.getUniformLocation(prog, 'view');
+				var tex = gl.getUniformLocation(prog, 'tex');
+
+				return [[posAttr, colAttr, uvAttr, modelAttr0, modelAttr1, modelAttr2, modelAttr3],
+				        [proj, view, tex]];
+			}
+
+			// Returns a vec4: x, y, z, radius
+			function treeTrunkPos(height, _current_base_radius, _current_height) {
+				// funnel type would do delta_curve=1-(1.0-height)*(1.0-height)
+				var delta_curve = height;
+				// canopy would do delta_curve*0.5
+				var radius = _current_base_radius * (1.0-delta_curve);
+				if (radius < 0.3) radius = 0.3;
+				// BENT and JAGGED would use height*height
+
+				return vec4.fromValues(0.0, 0.0, height*_current_height, radius);
+			}
+
+			function makeTree() {
+				var _default_height = 8 + 4; // + randf*4 + randf*4
+				var _default_branches = 2; // 2 + rand % 2
+				var _default_lowest_branch = 3.0 / _default_height;
+				var _default_base_radius = 0.2 + (_default_height / 20) * 0.5 // randf
+
+				var _current_height = _default_height; // * (0.5f + randf)
+				var _current_branches = _default_branches + 2; // + rand % 3
+				var _current_lowest_branch = _default_lowest_branch + 0.1; // randf*0.2
+				var _current_base_radius = _default_base_radius + 1 // rand%3
+
+				var _branch_reach = 1.25;  // 1 + randf*0.5
+
+				var branch_spacing = (0.95 - _current_lowest_branch) / _current_branches;
+				var branches = [];
+
+				for (var i=0; i<_current_branches; i++) {
+					var vertical_pos = _current_lowest_branch + i*branch_spacing;
+					branch = {};
+					branch.root = treeTrunkPos(vertical_pos, _current_base_radius, _current_height);
+					branch.length = (_current_height - branch.root[2]) * _branch_reach;
+					if (_current_height/2 < branch.length) branch.length = _current_height/2;
+					branch.lift = branch.length / 2;
+
+					branches.push(branch);
+				}
+
+				for (var i=-1; i<branches.length; i++) {
+					var core;
+					if (i<0) {
+						core = treeTrunkPos(0, _current_base_radius, _current_height);
+						// widen
+						core[3] = core[3] * 1.5;
+						// drop a bit
+						core[2] = core[2] - 2;
+					} else {
+						core = branches[i].root;
+					}
+
+					const STEPS = 7.0;
+
+					for (var ring=0; ring<=STEPS; ring++) {
+						var angle;
+						if (ring === 0 || ring === STEPS) {
+							angle = 0.0;
+						} else {
+							angle = ring * (2 * Math.PI/STEPS);
+						}
+						var x = Math.sin(angle), y = Math.cos(angle);  // bwuh?
+						var vert = vec4.create();
+						vec4.add(vert, core, vec4.fromValues(x*core[3], y*core[3], 0.0, 0.0));
+						var norm = vec4.fromValues(x, y, 0.0, 1.0);
+						var uv = vec4.fromValues((ring/STEPS)*0.249, core.z, 0.0, 0.0);
+					}
+				}
+			}
+
+			// Returns the list of buffers
+			function initBuffers(gl) {
+				var vertices = [
+					 1.0,  1.0, 0.0,
+					-1.0,  1.0, 0.0,
+					 1.0, -1.0, 0.0,
+					-1.0, -1.0, 0.0
+				];
+				var uv = [
+					0.0, 0.0,
+					4.0, 0.0,
+					0.0, 1.0,
+					4.0, 1.0
+				];
+				const ROWS = 4;
+				const COLS = 4;
+				const VERTICES = 4;
+
+				var vertbuf = gl.createBuffer();
+				gl.bindBuffer(gl.ARRAY_BUFFER, vertbuf);
+				gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+				var uvbuf = gl.createBuffer();
+				gl.bindBuffer(gl.ARRAY_BUFFER, uvbuf);
+				gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(uv), gl.STATIC_DRAW);
+
+				var model = mat4.create();
+				//mat4.translate(model, model, vec3.fromValues(0, 0, -1.5));
+				var modelarr = [];
+				// copy the nth column of model for each vertex, into each of n new Float32Arrays
+				// model is really a Float32Array, in column-major order; exploit that
+				for (var i = 0; i < COLS; i++) {
+					f32 = new Float32Array(ROWS * VERTICES);
+					col = model.subarray(i * ROWS, (i+1) * ROWS);
+					for (var j = 0; j < VERTICES; j++) {
+						f32.set(col, j * ROWS);
+					}
+					modelarr.push(f32);
+				}
+
+				var modelbuf0 = gl.createBuffer();
+				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf0);
+				gl.bufferData(gl.ARRAY_BUFFER, modelarr[0], gl.STATIC_DRAW);
+
+				var modelbuf1 = gl.createBuffer();
+				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf1);
+				gl.bufferData(gl.ARRAY_BUFFER, modelarr[1], gl.STATIC_DRAW);
+
+				var modelbuf2 = gl.createBuffer();
+				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf2);
+				gl.bufferData(gl.ARRAY_BUFFER, modelarr[2], gl.STATIC_DRAW);
+
+				var modelbuf3 = gl.createBuffer();
+				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf3);
+				gl.bufferData(gl.ARRAY_BUFFER, modelarr[3], gl.STATIC_DRAW);
+
+				var colors = [
+					1.0, 1.0, 1.0, 1.0,  // white
+					1.0, 0.0, 0.0, 1.0,  // red
+					0.0, 1.0, 0.0, 1.0,  // green
+					0.0, 0.0, 1.0, 1.0   // blue
+				];
+	
+				var colorbuf = gl.createBuffer();
+				gl.bindBuffer(gl.ARRAY_BUFFER, colorbuf);
+				gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+
+				return [vertbuf, colorbuf, uvbuf, modelbuf0, modelbuf1, modelbuf2, modelbuf3];
+			}
+
+			function texLoaded(gl, img, tex) {
+				gl.bindTexture(gl.TEXTURE_2D, tex);
+				gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+				gl.generateMipmap(gl.TEXTURE_2D);
+				gl.bindTexture(gl.TEXTURE_2D, null);
+			}
+
+			function initTextures(gl) {
+				tree = gl.createTexture();
+				treeImage = new Image();
+				treeImage.onload = function() { texLoaded(gl, treeImage, tree); }
+				treeImage.src = 'textures/bark1.bmp';
+
+				return [tree];
+			}
+
+			function start() {
+				var canvas = document.getElementById("glcanvas");
+				gl = null;
+				try {
+					gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+				}
+				catch(e) {alert(e);}
+
+				if (!gl) {
+					alert("Can't get \"webgl\" context from canvas; maybe no WebGL support?");
+					return;
+				}
+
+				gl.clearColor(0.0, 0.0, 0.0, 1.0);
+				gl.enable(gl.DEPTH_TEST);
+				gl.depthFunc(gl.LEQUAL);
+				gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+
+				gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+				gl.enable(gl.BLEND);
+
+				attributes = initShaders(gl);
+				buffers = initBuffers(gl);
+				textures = initTextures(gl);
+
+				// identity * translation
+				vm = mat4.create();
+				mat4.translate(vm, vm, vec3.fromValues(0, 0, -6));
+				pm = mat4.perspective(mat4.create(), Math.PI/4, 800.0/600.0, 0.1, 100);
+
+				// Do I really need this extra scope?  Eh, why not.
+				(function() {
+					var requestAnimationFrame = (window.requestAnimationFrame ||
+					                             window.mozRequestAnimationFrame ||
+					                             window.webkitRequestAnimationFrame ||
+					                             window.msRequestAnimationFrame);
+					window.requestAnimationFrame = requestAnimationFrame;
+				})();
+				window.requestAnimationFrame(drawScene);
+			}
+
+			var firsttimestamp = null;
+			var fpstimestamp = null;
+			var frames = 0;
+
+			function drawScene(timestamp) {
+				const SECONDS = 3;  // for a full revolution
+				const RADS_PER_SEC = 2*Math.PI / SECONDS;
+				if (firsttimestamp === null) {
+					firsttimestamp = timestamp;
+				}
+				if ((timestamp - firsttimestamp) > SECONDS*1000) {
+					firsttimestamp += SECONDS*1000;
+				}
+				if (fpstimestamp !== null) {
+					if (timestamp - fpstimestamp > 1000) {
+						document.getElementById('fps').firstChild.textContent = frames.toFixed(0);
+						fpstimestamp = timestamp;
+						frames = 0;
+					}
+				} else {
+					fpstimestamp = timestamp;
+				}
+				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+				// wouldn't it be nice if javascript did python-style unpacking...
+				// oh look, it does, but not in IE.  well, too bad, IE.
+				var [[posattr, colattr, uvattr, modelattr0, modelattr1, modelattr2, modelattr3],
+				     [proj, view, tex]] = attributes,
+					[vertbuf, colbuf, uvbuf, modelbuf0, modelbuf1, modelbuf2, modelbuf3] =
+					  buffers, 
+					[tree] = textures;
+
+				// rotate around the scene once every few seconds
+				radians = ((timestamp - firsttimestamp) / 1000) * RADS_PER_SEC;
+				viewmatrix = mat4.create();
+				mat4.rotateY(viewmatrix, vm, radians);
+				gl.uniformMatrix4fv(view, false, viewmatrix);
+				gl.uniformMatrix4fv(proj, false, pm);
+
+				gl.activeTexture(gl.TEXTURE0);
+				gl.bindTexture(gl.TEXTURE_2D, tree);
+				gl.uniform1i(tex, 0);
+
+				gl.bindBuffer(gl.ARRAY_BUFFER, vertbuf);
+				gl.vertexAttribPointer(posattr, 3, gl.FLOAT, false, 0, 0);
+
+				gl.bindBuffer(gl.ARRAY_BUFFER, colbuf);
+				gl.vertexAttribPointer(colattr, 4, gl.FLOAT, false, 0, 0);
+
+				gl.bindBuffer(gl.ARRAY_BUFFER, uvbuf);
+				gl.vertexAttribPointer(uvattr, 2, gl.FLOAT, false, 0, 0);
+
+				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf0);
+				gl.vertexAttribPointer(modelattr0, 4, gl.FLOAT, false, 0, 0)
+				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf1);
+				gl.vertexAttribPointer(modelattr1, 4, gl.FLOAT, false, 0, 0)
+				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf2);
+				gl.vertexAttribPointer(modelattr2, 4, gl.FLOAT, false, 0, 0)
+				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf3);
+				gl.vertexAttribPointer(modelattr3, 4, gl.FLOAT, false, 0, 0)
+
+				gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+				window.requestAnimationFrame(drawScene);
+
+				frames++;
+			}
+		</script>
+	</head>
+	<body onload="start()">
+		<canvas id="glcanvas" width="800" height="600">
+		Your browser doesn't appear to support the HTML5 <code>&lt;canvas&gt;</code> element.
+		</canvas>
+		<p><span id="fps">???</span> FPS</p>
+		<script type="x-shader/x-fragment" id="frag-shader">
+			#version 100
+
+			uniform sampler2D tex;
+			varying lowp vec4 vColor;
+			varying lowp vec2 vUV;
+
+			void main(void) {
+				lowp vec4 texel = texture2D(tex, vUV);
+				lowp vec4 ocolor = vColor;
+				ocolor.a = 1.0 - ((texel.r + texel.g + texel.b) / 3.0);
+				gl_FragColor = ocolor;
+			}
+		</script>
+		<script type="x-shader/x-vertex" id="vert-shader">
+			#version 100
+
+			attribute vec3 pos;
+			attribute vec4 color;
+			attribute vec2 uv;
+			attribute vec4 model0;
+			attribute vec4 model1;
+			attribute vec4 model2;
+			attribute vec4 model3;
+
+			uniform mat4 view;
+			uniform mat4 proj;
+
+			varying lowp vec4 vColor;
+			varying lowp vec2 vUV;
+
+			void main(void) {
+				mat4 model;
+				model[0] = model0;
+				model[1] = model1;
+				model[2] = model2;
+				model[3] = model3;
+				gl_Position = proj * view * model * vec4(pos, 1.0);
+				vColor = color;
+				vUV = uv;
+			}
+		</script>
+	</body>
+</html>

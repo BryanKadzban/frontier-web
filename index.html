@@ -4,8 +4,8 @@
 		<script src="gl-matrix-min.js"></script>
 		<script>
 			var gl;
-			var buffers;  // vertex, color, model0, model1, model2, model3
-			var attributes;  // [pos, color, model0, model1, model2, model3], [proj, view]
+			var buffers;  // vertex, norm, uv, index, model0, model1, model2, model3
+			var attributes;  // [pos, uv, model0, model1, model2, model3], [proj, view, tex]
 			var textures;  // [tree]
 			var vm, pm;
 
@@ -64,9 +64,6 @@
 				var posAttr = gl.getAttribLocation(prog, 'pos');
 				gl.enableVertexAttribArray(posAttr);
 
-				var colAttr = gl.getAttribLocation(prog, 'color');
-				gl.enableVertexAttribArray(colAttr);
-
 				var uvAttr = gl.getAttribLocation(prog, 'uv');
 				gl.enableVertexAttribArray(uvAttr);
 
@@ -81,9 +78,9 @@
 
 				var proj = gl.getUniformLocation(prog, 'proj');
 				var view = gl.getUniformLocation(prog, 'view');
-				var tex = gl.getUniformLocation(prog, 'tex');
+				var tex = gl.getUniformLocation(prog, 'texture');
 
-				return [[posAttr, colAttr, uvAttr, modelAttr0, modelAttr1, modelAttr2, modelAttr3],
+				return [[posAttr, uvAttr, modelAttr0, modelAttr1, modelAttr2, modelAttr3],
 				        [proj, view, tex]];
 			}
 
@@ -126,6 +123,11 @@
 					branches.push(branch);
 				}
 
+				var vertices = [], indices = [];
+				var vert, norm, uv;
+
+				const STEPS = 7.0;
+
 				for (var i=-1; i<branches.length; i++) {
 					var core;
 					if (i<0) {
@@ -138,8 +140,6 @@
 						core = branches[i].root;
 					}
 
-					const STEPS = 7.0;
-
 					for (var ring=0; ring<=STEPS; ring++) {
 						var angle;
 						if (ring === 0 || ring === STEPS) {
@@ -147,40 +147,91 @@
 						} else {
 							angle = ring * (2 * Math.PI/STEPS);
 						}
-						var x = Math.sin(angle), y = Math.cos(angle);  // bwuh?
-						var vert = vec4.create();
+						var x = Math.cos(angle), y = Math.sin(angle);
+						vert = vec4.create();
 						vec4.add(vert, core, vec4.fromValues(x*core[3], y*core[3], 0.0, 0.0));
-						var norm = vec4.fromValues(x, y, 0.0, 1.0);
-						var uv = vec4.fromValues((ring/STEPS)*0.249, core.z, 0.0, 0.0);
+						norm = vec3.fromValues(x, y, 0.0);
+						uv = vec2.fromValues((ring/STEPS)*0.249, core.z);
+						vertices.push([vert, norm, uv]);
 					}
 				}
+
+				// tip vertex
+				vert = treeTrunkPos(1.0, _current_base_radius, _current_height);
+				vert[3] = 0.0;
+				norm = vec3.fromValues(0.0, 0.0, 1.0);
+				uv = vec2.fromValues(0.0, 0.0);
+				vertices.push([vert, norm, uv]);
+
+				function pushTri(index1, index2, index3) {
+					indices.push(index1);
+					indices.push(index2);
+					indices.push(index3);
+				}
+				function pushQuad(index1, index2, index3, index4) {
+					pushTri(index1, index2, index3);
+					pushTri(index1, index3, index4);
+				}
+
+				// index lists into the vertices array
+				for (var segment=0; segment<branches.length; segment++) {
+					for (var ring=0; ring<STEPS; ring++) {
+						pushQuad(
+							(ring+0) + (segment+0)*(STEPS+1),
+							(ring+1) + (segment+0)*(STEPS+1),
+							(ring+1) + (segment+1)*(STEPS+1),
+							(ring+0) + (segment+1)*(STEPS+1)
+						);
+					}
+				}
+
+				for (var ring=0; ring<STEPS; ring++) {
+					pushTri(
+						(ring+1) + (branches.length)*(STEPS+1),
+						vertices.length - 1,
+						(ring+0) + (branches.length)*(STEPS+1)
+					);
+				}
+
+				// TODO: foliage
+
+				return [vertices, indices];
 			}
 
 			// Returns the list of buffers
 			function initBuffers(gl) {
-				var vertices = [
-					 1.0,  1.0, 0.0,
-					-1.0,  1.0, 0.0,
-					 1.0, -1.0, 0.0,
-					-1.0, -1.0, 0.0
-				];
-				var uv = [
-					0.0, 0.0,
-					4.0, 0.0,
-					0.0, 1.0,
-					4.0, 1.0
-				];
+				var [vertices, indices] = makeTree();
 				const ROWS = 4;
 				const COLS = 4;
-				const VERTICES = 4;
+				const VERTICES = vertices.length;
+
+				// rearrange data in vertices
+				var vertex_f32 = new Float32Array(VERTICES * 3),
+					norm_f32 = new Float32Array(VERTICES * 3),
+					uv_f32 = new Float32Array(VERTICES * 2);
+				for (var i=0; i<vertices.length; i++) {
+					vertex_f32.set(vertices[i][0].subarray(0, 3), i*3);
+					norm_f32.set(vertices[i][1], i*3);
+					uv_f32.set(vertices[i][2], i*2);
+				}
 
 				var vertbuf = gl.createBuffer();
 				gl.bindBuffer(gl.ARRAY_BUFFER, vertbuf);
-				gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+				gl.bufferData(gl.ARRAY_BUFFER, vertex_f32, gl.STATIC_DRAW);
+
+				var normbuf = gl.createBuffer();
+				gl.bindBuffer(gl.ARRAY_BUFFER, normbuf);
+				gl.bufferData(gl.ARRAY_BUFFER, norm_f32, gl.STATIC_DRAW);
 
 				var uvbuf = gl.createBuffer();
 				gl.bindBuffer(gl.ARRAY_BUFFER, uvbuf);
-				gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(uv), gl.STATIC_DRAW);
+				gl.bufferData(gl.ARRAY_BUFFER, uv_f32, gl.STATIC_DRAW);
+
+				var indexbuf = gl.createBuffer();
+				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexbuf);
+				gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+				// yes, this is extra
+				indexbuf.length = indices.length;
 
 				var model = mat4.create();
 				//mat4.translate(model, model, vec3.fromValues(0, 0, -1.5));
@@ -212,18 +263,8 @@
 				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf3);
 				gl.bufferData(gl.ARRAY_BUFFER, modelarr[3], gl.STATIC_DRAW);
 
-				var colors = [
-					1.0, 1.0, 1.0, 1.0,  // white
-					1.0, 0.0, 0.0, 1.0,  // red
-					0.0, 1.0, 0.0, 1.0,  // green
-					0.0, 0.0, 1.0, 1.0   // blue
-				];
-	
-				var colorbuf = gl.createBuffer();
-				gl.bindBuffer(gl.ARRAY_BUFFER, colorbuf);
-				gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
-
-				return [vertbuf, colorbuf, uvbuf, modelbuf0, modelbuf1, modelbuf2, modelbuf3];
+				return [vertbuf, normbuf, uvbuf, indexbuf, modelbuf0, modelbuf1, modelbuf2,
+				        modelbuf3];
 			}
 
 			function texLoaded(gl, img, tex) {
@@ -262,16 +303,13 @@
 				gl.depthFunc(gl.LEQUAL);
 				gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
 
-				gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-				gl.enable(gl.BLEND);
-
 				attributes = initShaders(gl);
 				buffers = initBuffers(gl);
 				textures = initTextures(gl);
 
 				// identity * translation
 				vm = mat4.create();
-				mat4.translate(vm, vm, vec3.fromValues(0, 0, -6));
+				mat4.translate(vm, vm, vec3.fromValues(0, 0, -30));
 				pm = mat4.perspective(mat4.create(), Math.PI/4, 800.0/600.0, 0.1, 100);
 
 				// Do I really need this extra scope?  Eh, why not.
@@ -311,10 +349,10 @@
 
 				// wouldn't it be nice if javascript did python-style unpacking...
 				// oh look, it does, but not in IE.  well, too bad, IE.
-				var [[posattr, colattr, uvattr, modelattr0, modelattr1, modelattr2, modelattr3],
+				var [[posattr, uvattr, modelattr0, modelattr1, modelattr2, modelattr3],
 				     [proj, view, tex]] = attributes,
-					[vertbuf, colbuf, uvbuf, modelbuf0, modelbuf1, modelbuf2, modelbuf3] =
-					  buffers, 
+					[vertbuf, normbuf, uvbuf, indexbuf, modelbuf0, modelbuf1, modelbuf2,
+					 modelbuf3] = buffers,
 					[tree] = textures;
 
 				// rotate around the scene once every few seconds
@@ -331,9 +369,6 @@
 				gl.bindBuffer(gl.ARRAY_BUFFER, vertbuf);
 				gl.vertexAttribPointer(posattr, 3, gl.FLOAT, false, 0, 0);
 
-				gl.bindBuffer(gl.ARRAY_BUFFER, colbuf);
-				gl.vertexAttribPointer(colattr, 4, gl.FLOAT, false, 0, 0);
-
 				gl.bindBuffer(gl.ARRAY_BUFFER, uvbuf);
 				gl.vertexAttribPointer(uvattr, 2, gl.FLOAT, false, 0, 0);
 
@@ -346,7 +381,8 @@
 				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf3);
 				gl.vertexAttribPointer(modelattr3, 4, gl.FLOAT, false, 0, 0)
 
-				gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexbuf);
+				gl.drawElements(gl.TRIANGLES, indexbuf.length, gl.UNSIGNED_SHORT, 0);
 
 				window.requestAnimationFrame(drawScene);
 
@@ -362,22 +398,18 @@
 		<script type="x-shader/x-fragment" id="frag-shader">
 			#version 100
 
-			uniform sampler2D tex;
-			varying lowp vec4 vColor;
 			varying lowp vec2 vUV;
 
+			uniform sampler2D texture;
+
 			void main(void) {
-				lowp vec4 texel = texture2D(tex, vUV);
-				lowp vec4 ocolor = vColor;
-				ocolor.a = 1.0 - ((texel.r + texel.g + texel.b) / 3.0);
-				gl_FragColor = ocolor;
+				gl_FragColor = texture2D(texture, vUV);
 			}
 		</script>
 		<script type="x-shader/x-vertex" id="vert-shader">
 			#version 100
 
 			attribute vec3 pos;
-			attribute vec4 color;
 			attribute vec2 uv;
 			attribute vec4 model0;
 			attribute vec4 model1;
@@ -387,7 +419,6 @@
 			uniform mat4 view;
 			uniform mat4 proj;
 
-			varying lowp vec4 vColor;
 			varying lowp vec2 vUV;
 
 			void main(void) {
@@ -397,7 +428,6 @@
 				model[2] = model2;
 				model[3] = model3;
 				gl_Position = proj * view * model * vec4(pos, 1.0);
-				vColor = color;
 				vUV = uv;
 			}
 		</script>

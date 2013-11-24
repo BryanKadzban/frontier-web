@@ -314,6 +314,31 @@ Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, pos_list, fs
 	}, base_index);
 };
 
+// Same for vines
+Tree.prototype.makeVines_ = function(vertices, pushQuad, bottom_points) {
+	var base_index = vertices.length,
+	    vert, norm = vec3.fromValues(0.0, 0.0, 1.0), uv,
+	    vert_2 = vec4.create();
+
+	// if (!has_vines_) return;
+
+	for (var segment = 0; segment < bottom_points.length; segment++) {
+		vert = vec4.clone(bottom_points[segment]);
+		vertices.push([vert, norm, vec2.fromValues(0.75, segment)]);
+		vec4.add(vert_2, vert, vec4.fromValues(0.0, 0.0, -3.5, 0.0));
+		vertices.push([vec4.clone(vert_2), norm, vec2.fromValues(0.5, segment)]);
+	}
+
+	for (var segment = 0; segment < bottom_points.length-1; segment++) {
+		pushQuad(
+			base_index + segment*2,
+			base_index + segment*2 + 1,
+			base_index + (segment + 1)*2,
+			base_index + (segment + 1)*2 + 1
+		);
+	}
+};
+
 // Same for a branch
 Tree.prototype.makeBranch_ = function(vertices, pushTri, pushQuad, anchor, angle, _branch_lift) {
 	if (anchor.length < 2.0) return;
@@ -405,7 +430,7 @@ Tree.prototype.makeBranch_ = function(vertices, pushTri, pushQuad, anchor, angle
 	var pos_list = vertices[vertices.length - 1];
 	this.makeFoliage_(vertices, pushTri, pushQuad, pos_list, anchor.length * 0.56, angle);
 
-	// TODO: vines
+	this.makeVines_(vertices, pushQuad, underside_vertices);
 }
 
 // Add vertices for this tree to the vertices list (each item is a list of vert,

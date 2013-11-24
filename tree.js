@@ -415,24 +415,26 @@ Tree.prototype.makeBranch_ = function(vertices, pushTri, pushQuad, anchor, angle
 // TODO: This is a lie right now; the model matrix is not added to vertices.
 // Fix.
 Tree.prototype.Build = function(vertices, indices) {
-	// TODO: at some point these var statements should all be combined
-	var _default_height = 8 + 4; // + randf*4 + randf*4
-	var _default_branches = 2; // 2 + rand % 2
-	var _default_lowest_branch = 3.0 / _default_height;
-	var _default_base_radius = 0.2 + (_default_height / 20) * 0.5 // randf
+	var _default_height = 8 + 4, // + randf*4 + randf*4
+	    _default_branches = 2, // 2 + rand % 2
+	    _default_lowest_branch = 3.0 / _default_height,
+	    _default_base_radius = 0.2 + (_default_height / 20) * 0.5, // randf
 
-	var _current_height = _default_height; // * (0.5f + randf)
-	var _current_branches = _default_branches + 2; // + rand % 3
-	var _current_lowest_branch = _default_lowest_branch + 0.1; // randf*0.2
-	var _current_base_radius = _default_base_radius + 1 // rand%3
+	    _current_height = _default_height, // * (0.5f + randf)
+	    _current_branches = _default_branches + 2, // + rand % 3
+	    _current_lowest_branch = _default_lowest_branch + 0.1, // randf*0.2
+	    _current_base_radius = _default_base_radius + 1, // rand%3
 
-	var _branch_reach = 1.25;  // 1 + randf*0.5
-	var _branch_lift = 1.5;  // 1 + randf
+	    _branch_reach = 1.25,  // 1 + randf*0.5
+	    _branch_lift = 1.5,  // 1 + randf
 
-	var _current_angle_offset = Math.PI;  // randf*2*PI
+	    _current_angle_offset = Math.PI,  // randf*2*PI
 
-	var branch_spacing = (0.95 - _current_lowest_branch) / _current_branches;
-	var branches = [];
+	    branch_spacing = (0.95 - _current_lowest_branch) / _current_branches,
+	    branches = [],
+	    vert, norm, uv,
+	    base_index = vertices.length,
+	    foliage_height;
 
 	for (var i=0; i<_current_branches; i++) {
 		var vertical_pos = _current_lowest_branch + i*branch_spacing;
@@ -445,7 +447,6 @@ Tree.prototype.Build = function(vertices, indices) {
 		branches.push(branch);
 	}
 
-	var vert, norm, uv, base_index = vertices.length;
 	const STEPS = 7.0;
 
 	for (var i=-1; i<branches.length; i++) {
@@ -511,8 +512,6 @@ Tree.prototype.Build = function(vertices, indices) {
 			base_index + (ring+0) + (branches.length)*(STEPS+1)
 		);
 	}
-
-	var foliage_height;
 
 	if (this.tree_type_ == TreeType.CANOPY) {
 		foliage_height = _current_height;

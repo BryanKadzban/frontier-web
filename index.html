@@ -19,6 +19,13 @@
 				}
 			}
 
+			function Vertex(vert, norm, uv, model) {
+				this.vertex = vert;
+				this.normal = norm;
+				this.uv = uv;
+				this.model = model;
+			}
+
 			function getShader(gl, id) {
 				var shaderScript = document.getElementById(id);
 				var shader = null;
@@ -106,11 +113,22 @@
 				// rearrange data in vertices
 				var vertex_f32 = new Float32Array(VERTICES * 3),
 					norm_f32 = new Float32Array(VERTICES * 3),
-					uv_f32 = new Float32Array(VERTICES * 2);
+					uv_f32 = new Float32Array(VERTICES * 2),
+					models_f32 = [new Float32Array(VERTICES * ROWS),
+					              new Float32Array(VERTICES * ROWS),
+					              new Float32Array(VERTICES * ROWS),
+					              new Float32Array(VERTICES * ROWS)];
 				for (var i=0; i<vertices.length; i++) {
-					vertex_f32.set(vertices[i][0].subarray(0, 3), i*3);
-					norm_f32.set(vertices[i][1], i*3);
-					uv_f32.set(vertices[i][2], i*2);
+					vertex_f32.set(vertices[i].vertex.subarray(0, 3), i*3);
+					norm_f32.set(vertices[i].normal, i*3);
+					uv_f32.set(vertices[i].uv, i*2);
+					// copy the nth column of vertices[i].model for each vertex,
+					// into each of n new Float32Arrays.  .model is really a
+					// Float32Array, in column-major order; exploit that.
+					for (var col = 0; col < COLS; col++) {
+						var col_f32 = vertices[i].model.subarray(col*ROWS, (col+1)*ROWS);
+						models_f32[col].set(col_f32, i * ROWS);
+					}
 				}
 
 				var vertbuf = gl.createBuffer();
@@ -131,35 +149,21 @@
 				// yes, this is extra
 				indexbuf.length = indices.length;
 
-				var model = mat4.create();
-				mat4.rotateX(model, model, -Math.PI / 2);
-				var modelarr = [];
-				// copy the nth column of model for each vertex, into each of n new Float32Arrays
-				// model is really a Float32Array, in column-major order; exploit that
-				for (var i = 0; i < COLS; i++) {
-					f32 = new Float32Array(ROWS * VERTICES);
-					col = model.subarray(i * ROWS, (i+1) * ROWS);
-					for (var j = 0; j < VERTICES; j++) {
-						f32.set(col, j * ROWS);
-					}
-					modelarr.push(f32);
-				}
-
 				var modelbuf0 = gl.createBuffer();
 				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf0);
-				gl.bufferData(gl.ARRAY_BUFFER, modelarr[0], gl.STATIC_DRAW);
+				gl.bufferData(gl.ARRAY_BUFFER, models_f32[0], gl.STATIC_DRAW);
 
 				var modelbuf1 = gl.createBuffer();
 				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf1);
-				gl.bufferData(gl.ARRAY_BUFFER, modelarr[1], gl.STATIC_DRAW);
+				gl.bufferData(gl.ARRAY_BUFFER, models_f32[1], gl.STATIC_DRAW);
 
 				var modelbuf2 = gl.createBuffer();
 				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf2);
-				gl.bufferData(gl.ARRAY_BUFFER, modelarr[2], gl.STATIC_DRAW);
+				gl.bufferData(gl.ARRAY_BUFFER, models_f32[2], gl.STATIC_DRAW);
 
 				var modelbuf3 = gl.createBuffer();
 				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf3);
-				gl.bufferData(gl.ARRAY_BUFFER, modelarr[3], gl.STATIC_DRAW);
+				gl.bufferData(gl.ARRAY_BUFFER, models_f32[3], gl.STATIC_DRAW);
 
 				return [vertbuf, normbuf, uvbuf, indexbuf, modelbuf0, modelbuf1, modelbuf2,
 				        modelbuf3];

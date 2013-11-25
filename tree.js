@@ -78,7 +78,7 @@ Tree.prototype.trunkPos_ = function(height, base_radius, _current_height) {
 };
 
 // Adds vertices and indices for the foliage to the appropriate lists
-Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, pos_list, fsize, angle) {
+Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, vertex, fsize, angle) {
 	var uvTL = vec2.fromValues(0.25, 0.0),
 	    uvTR = vec2.fromValues(0.5, 0.0),
 	    uvBR = vec2.fromValues(0.5, 1.0),
@@ -88,8 +88,8 @@ Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, pos_list, fs
 	    tip_height = fsize / 4.0;
 
 	// don't let foliage touch the ground
-	if (fsize < (pos_list.vertex[2] - 2.0)) {
-		fsize = (pos_list.vertex[2] - 2.0);
+	if (fsize < (vertex[2] - 2.0)) {
+		fsize = (vertex[2] - 2.0);
 	}
 	if (fsize < 0.1) {
 		return;
@@ -310,7 +310,7 @@ Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, pos_list, fs
 
 	vertices.foreach(function(vertlist) {
 		vec4.transformMat4(vertlist.vertex, vertlist.vertex, angle_mat);
-		vec4.add(vertlist.vertex, vertlist.vertex, pos_list.vertex);
+		vec4.add(vertlist.vertex, vertlist.vertex, vertex);
 	}, base_index);
 };
 
@@ -427,8 +427,8 @@ Tree.prototype.makeBranch_ = function(vertices, pushTri, pushQuad, anchor, angle
 	}
 
 	// grab the last point and use it as the origin for the foliage
-	var pos_list = vertices[vertices.length - 1];
-	this.makeFoliage_(vertices, pushTri, pushQuad, pos_list, anchor.length * 0.56, angle);
+	var last_vertex = vertices[vertices.length - 1].vertex;
+	this.makeFoliage_(vertices, pushTri, pushQuad, last_vertex, anchor.length * 0.56, angle);
 
 	this.makeVines_(vertices, pushQuad, underside_vertices);
 }
@@ -541,14 +541,18 @@ Tree.prototype.Build = function(vertices, indices) {
 		foliage_height = _current_height / 2;
 	}
 
-	this.makeFoliage_(vertices, pushTri, pushQuad, last_vert, foliage_height, 0.0);
-
-	// TODO: EVERGREEN would not create branches; it would call makeFoliage_ a
-	// couple more times instead
+	this.makeFoliage_(vertices, pushTri, pushQuad, last_vert.vertex, foliage_height, 0.0);
 
 	for (var i=0; i<branches.length; i++) {
-		var angle = _current_angle_offset + i * ((2*Math.PI / branches.length) + Math.PI);
-		this.makeBranch_(vertices, pushTri, pushQuad, branches[i], angle, _branch_lift);
+		if (this.tree_type_ == TreeType.EVERGREEN) {
+			// just rings of foliage, no actual branches
+			var angle = i * (2*Math.PI / branches.length);
+			this.makeFoliage_(vertices, pushTri, pushQuad,
+					branches[i].root, branches[i].length, angle);
+		} else {
+			var angle = _current_angle_offset + i * ((2*Math.PI / branches.length) + Math.PI);
+			this.makeBranch_(vertices, pushTri, pushQuad, branches[i], angle, _branch_lift);
+		}
 	}
 
 	// This is a bit of a hack; all the "model" items weren't set above, so set

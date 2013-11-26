@@ -104,8 +104,15 @@
 			// Returns the list of buffers
 			function initBuffers(gl) {
 				var vertices = [], indices = [];
-				var tree = new Tree(TreeType.EVERGREEN, FoliageType.UMBRELLA, false, BranchType.NORMAL);
+				var pos = vec3.fromValues(-20.0, -20.0, 0.0);
+				var pos2 = vec3.fromValues(20.0, 20.0, 0.0);
+				var pos3 = vec3.fromValues(0.0, 0.0, 0.0);
+				var tree = new Tree(TreeType.EVERGREEN, FoliageType.UMBRELLA, false, BranchType.NORMAL, pos);
+				var tree2 = new Tree(TreeType.EVERGREEN, FoliageType.UMBRELLA, false, BranchType.NORMAL, pos2);
+				var tree3 = new Tree(TreeType.CANOPY, FoliageType.UMBRELLA, false, BranchType.NORMAL, pos3);
 				tree.Build(vertices, indices);
+				tree2.Build(vertices, indices);
+				tree3.Build(vertices, indices);
 				const ROWS = 4;
 				const COLS = 4;
 				const VERTICES = vertices.length;
@@ -211,8 +218,8 @@
 
 				// identity * translation
 				vm = mat4.create();
-				mat4.translate(vm, vm, vec3.fromValues(0, -10, -50));
-				pm = mat4.perspective(mat4.create(), Math.PI/4, 800.0/600.0, 0.1, 100);
+				mat4.translate(vm, vm, vec3.fromValues(0, -8, -70));
+				pm = mat4.perspective(mat4.create(), Math.PI/4, 800.0/600.0, 0.1, 150);
 
 				// Do I really need this extra scope?  Eh, why not.
 				(function() {

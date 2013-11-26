@@ -28,12 +28,19 @@ var FoliageType = Object.freeze({
 
 // gl-matrix.js or gl-matrix-min.js must be evaluated before this file
 
-function Tree(tree_type, foliage_type, funnel, trunk_type) {
+function Tree(tree_type, foliage_type, funnel, trunk_type, position) {
 	this.tree_type_ = tree_type;
 	this.foliage_type_ = foliage_type;
 	this.funnel_ = funnel;
 	this.trunk_type_ = trunk_type;
 	this.bend_freq_ = 1.0 + (Math.random()*2) + Math.random();
+	this.model_ = mat4.create();
+	// Tree-building and object-placing code assumes positive Z is "up", but it's
+	// actually "into the screen".  Fix by rotating the model matrix.
+	mat4.rotateX(this.model_, this.model_, -Math.PI / 2);
+
+	// Now move it into place
+	mat4.translate(this.model_, this.model_, position);
 }
 
 const SEGMENTS_PER_METER = 0.25;
@@ -78,7 +85,7 @@ Tree.prototype.trunkPos_ = function(height, base_radius, _current_height) {
 };
 
 // Adds vertices and indices for the foliage to the appropriate lists
-Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, vertex, fsize, angle) {
+Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, vertex, fsize, angle, model) {
 	var uvTL = vec2.fromValues(0.25, 0.0),
 	    uvTR = vec2.fromValues(0.5, 0.0),
 	    uvBR = vec2.fromValues(0.5, 1.0),
@@ -95,33 +102,39 @@ Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, vertex, fsiz
 		return;
 	}
 
+	var model_temp = mat4.create();
+	mat4.translate(model_temp, model, vertex);
+	mat4.rotateZ(model_temp, model_temp, angle);
+
+	model = model_temp;
+
 	switch(this.foliage_type_) {
 		case FoliageType.PANEL:
 			norm = vec3.fromValues(0.0, 0.0, 1.0);
 
 			vert = vec4.fromValues(0.0,  -fsize, -fsize, 0.0);
-			vertices.push(new Vertex(vert, norm, uvTL));
+			vertices.push(new Vertex(vert, norm, uvTL, model));
 
 			vert = vec4.fromValues(-1.0,  fsize, -fsize, 0.0);
-			vertices.push(new Vertex(vert, norm, uvTR));
+			vertices.push(new Vertex(vert, norm, uvTR, model));
 
 			vert = vec4.fromValues(-1.0,  fsize,  fsize, 0.0);
-			vertices.push(new Vertex(vert, norm, uvBR));
+			vertices.push(new Vertex(vert, norm, uvBR, model));
 
 			vert = vec4.fromValues(0.0,  -fsize,  fsize, 0.0);
-			vertices.push(new Vertex(vert, norm, uvBL));
+			vertices.push(new Vertex(vert, norm, uvBL, model));
 
 			vert = vec4.fromValues(0.0,  -fsize, -fsize, 0.0);
-			vertices.push(new Vertex(vert, norm, uvTR));
+			vertices.push(new Vertex(vert, norm, uvTR, model));
 
 			vert = vec4.fromValues(1.0,   fsize, -fsize, 0.0);
-			vertices.push(new Vertex(vert, norm, uvBR));
+			vertices.push(new Vertex(vert, norm, uvBR, model));
 
 			vert = vec4.fromValues(1.0,   fsize,  fsize, 0.0);
-			vertices.push(new Vertex(vert, norm, uvBL));
+			vertices.push(new Vertex(vert, norm, uvBL, model));
 
 			vert = vec4.fromValues(0.0,  -fsize,  fsize, 0.0);
-			vertices.push(new Vertex(vert, norm, uvTL));
+			vertices.push(new Vertex(vert, norm, uvTL, model));
 
 			pushQuad(base_index + 0, base_index + 1, base_index + 2, base_index + 3);
 			pushQuad(base_index + 7, base_index + 6, base_index + 5, base_index + 4);
@@ -132,23 +145,23 @@ Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, vertex, fsiz
 
 			vert = vec4.fromValues(fsize / 2, 0.0,  0.0, 0.0);
 			vec2.lerp(uv, uvTL, uvBR, 0.5);
-			vertices.push(new Vertex(vert, norm, uv));
+			vertices.push(new Vertex(vert, norm, uv, model));
 
 			vert = vec4.fromValues(0.0, -fsize, 0.0, 0.0);
-			vertices.push(new Vertex(vert, norm, uvTL));
+			vertices.push(new Vertex(vert, norm, uvTL, model));
 
 			vert = vec4.fromValues(0.0,  0.0,  fsize, 0.0);
-			vertices.push(new Vertex(vert, norm, uvTR));
+			vertices.push(new Vertex(vert, norm, uvTR, model));
 
 			vert = vec4.fromValues(0.0,  fsize, 0.0, 0.0);
-			vertices.push(new Vertex(vert, norm, uvBR));
+			vertices.push(new Vertex(vert, norm, uvBR, model));
 
 			vert = vec4.fromValues(0.0,  0.0,  -fsize, 0.0);
-			vertices.push(new Vertex(vert, norm, uvBL));
+			vertices.push(new Vertex(vert, norm, uvBL, model));
 
 			// uv is still the lerp'ed value
 			vert = vec4.fromValues(-fsize / 2, 0.0,  0.0, 0.0);
-			vertices.push(new Vertex(vert, norm, uv));
+			vertices.push(new Vertex(vert, norm, uv, model));
 
 			pushTri(base_index, base_index + 1, base_index + 2);
 			pushTri(base_index, base_index + 2, base_index + 3);
@@ -180,41 +193,41 @@ Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, vertex, fsiz
 			// center
 			vert = vec4.fromValues(0.0, 0.0, 0.0, 0.0);
 			vec2.lerp(uv, uvTL, uvBR, 0.5);
-			vertices.push(new Vertex(vert, norm, uv));
+			vertices.push(new Vertex(vert, norm, uv, model));
 
 			// first ring
 			vert = vec4.fromValues(-fsize / 2, -fsize / 2, level1, 0.0);
 			vec2.lerp(uv_mid, uvTL, uvTR, 0.5);
-			vertices.push(new Vertex(vert, norm, vec2.clone(uv_mid)));
+			vertices.push(new Vertex(vert, norm, vec2.clone(uv_mid), model));
 
 			vert = vec4.fromValues( fsize / 2, -fsize / 2, level1, 0.0);
 			vec2.lerp(uv_mid, uvTR, uvBR, 0.5);
-			vertices.push(new Vertex(vert, norm, vec2.clone(uv_mid)));
+			vertices.push(new Vertex(vert, norm, vec2.clone(uv_mid), model));
 
 			vert = vec4.fromValues( fsize / 2,  fsize / 2, level1, 0.0);
 			vec2.lerp(uv_mid, uvBL, uvBR, 0.5);
-			vertices.push(new Vertex(vert, norm, vec2.clone(uv_mid)));
+			vertices.push(new Vertex(vert, norm, vec2.clone(uv_mid), model));
 
 			vert = vec4.fromValues(-fsize / 2,  fsize / 2, level1, 0.0);
 			vec2.lerp(uv_mid, uvTL, uvBL, 0.5);
-			vertices.push(new Vertex(vert, norm, vec2.clone(uv_mid)));
+			vertices.push(new Vertex(vert, norm, vec2.clone(uv_mid), model));
 
 			// tips
 			vert = vec4.fromValues(0.0, -fsize, level2, 0.0);
-			vertices.push(new Vertex(vert, norm, uvTR));
+			vertices.push(new Vertex(vert, norm, uvTR, model));
 
 			vert = vec4.fromValues(fsize,  0.0, level2, 0.0);
-			vertices.push(new Vertex(vert, norm, uvBR));
+			vertices.push(new Vertex(vert, norm, uvBR, model));
 
 			vert = vec4.fromValues(0.0,  fsize, level2, 0.0);
-			vertices.push(new Vertex(vert, norm, uvBL));
+			vertices.push(new Vertex(vert, norm, uvBL, model));
 
 			vert = vec4.fromValues(-fsize, 0.0, level2, 0.0);
-			vertices.push(new Vertex(vert, norm, uvTL));
+			vertices.push(new Vertex(vert, norm, uvTL, model));
 
 			// center, but lower
 			vert = vec4.fromValues( 0.0, 0.0, level1 / 16, 0.0);
-			vertices.push(new Vertex(vert, norm, uv));
+			vertices.push(new Vertex(vert, norm, uv, model));
 
 			// indices
 			// cap
@@ -235,27 +248,27 @@ Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, vertex, fsiz
 			vert = vec4.fromValues(0.0, 0.0, tip_height, 0.0);
 			norm = vec3.fromValues(0.0, 0.0, 1.0);
 			vec2.lerp(uv, uvTL, uvBR, 0.5);
-			vertices.push(new Vertex(vert, norm, uv));
+			vertices.push(new Vertex(vert, norm, uv, model));
 
 			vert = vec4.fromValues(-fsize, -fsize, -tip_height, 0.0);
 			norm = vec3.fromValues(-0.5, -0.5, 0.0);
-			vertices.push(new Vertex(vert, norm, uvTL));
+			vertices.push(new Vertex(vert, norm, uvTL, model));
 
 			vert = vec4.fromValues(fsize, -fsize, -tip_height, 0.0);
 			norm = vec3.fromValues( 0.5, -0.5, 0.0);
-			vertices.push(new Vertex(vert, norm, uvTR));
+			vertices.push(new Vertex(vert, norm, uvTR, model));
 
 			vert = vec4.fromValues(fsize, fsize, -tip_height, 0.0);
 			norm = vec3.fromValues( 0.5, 0.5, 0.0);
-			vertices.push(new Vertex(vert, norm, uvBR));
+			vertices.push(new Vertex(vert, norm, uvBR, model));
 
 			vert = vec4.fromValues(-fsize, fsize, -tip_height, 0.0);
 			norm = vec3.fromValues(-0.5, 0.5, 0.0);
-			vertices.push(new Vertex(vert, norm, uvBL));
+			vertices.push(new Vertex(vert, norm, uvBL, model));
 
 			vert = vec4.fromValues(0.0, 0.0, tip_height / 2, 0.0);
 			norm = vec3.fromValues(0.0, 0.0, 1.0);
-			vertices.push(new Vertex(vert, norm, uv));
+			vertices.push(new Vertex(vert, norm, uv, model));
 
 			pushTri(base_index, base_index + 1, base_index + 2);
 			pushTri(base_index, base_index + 2, base_index + 3);
@@ -274,28 +287,28 @@ Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, vertex, fsiz
 			vert = vec4.fromValues(0.0, 0.0, tip_height, 0.0);
 			norm = vec3.fromValues(0.0, 0.0, 1.0);
 			vec2.lerp(uv, uvTL, uvBR, 0.5);
-			vertices.push(new Vertex(vert, norm, uv));
+			vertices.push(new Vertex(vert, norm, uv, model));
 
 			vert = vec4.fromValues(-fsize, -fsize, -tip_height, 0.0);
 			norm = vec3.fromValues(-0.5, -0.5, 0.0);
-			vertices.push(new Vertex(vert, norm, uvTL));
+			vertices.push(new Vertex(vert, norm, uvTL, model));
 
 			vert = vec4.fromValues(fsize, -fsize, -tip_height, 0.0);
 			norm = vec3.fromValues(0.5, -0.5, 0.0);
-			vertices.push(new Vertex(vert, norm, uvTR));
+			vertices.push(new Vertex(vert, norm, uvTR, model));
 
 			vert = vec4.fromValues(fsize, fsize, -tip_height, 0.0);
 			norm = vec3.fromValues(0.5, 0.5, 0.0);
-			vertices.push(new Vertex(vert, norm, uvBR));
+			vertices.push(new Vertex(vert, norm, uvBR, model));
 
 			vert = vec4.fromValues(-fsize, fsize, -tip_height, 0.0);
 			norm = vec3.fromValues(-0.5, 0.5, 0.0);
-			vertices.push(new Vertex(vert, norm, uvBL));
+			vertices.push(new Vertex(vert, norm, uvBL, model));
 
 			vert = vec4.fromValues(0.0, 0.0, tip_height / 2, 0.0);
 			norm = vec3.fromValues(0.0, 0.0, 1.0);
 			// uv still has the previous lerp'ed value
-			vertices.push(new Vertex(vert, norm, uv));
+			vertices.push(new Vertex(vert, norm, uv, model));
 
 			pushTri(base_index, base_index + 2, base_index + 1);
 			pushTri(base_index, base_index + 3, base_index + 2);
@@ -304,18 +317,10 @@ Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, vertex, fsiz
 
 			break;
 	}
-
-	var angle_mat = mat4.create();
-	mat4.rotateZ(angle_mat, angle_mat, angle);
-
-	vertices.foreach(function(vertlist) {
-		vec4.transformMat4(vertlist.vertex, vertlist.vertex, angle_mat);
-		vec4.add(vertlist.vertex, vertlist.vertex, vertex);
-	}, base_index);
 };
 
 // Same for vines
-Tree.prototype.makeVines_ = function(vertices, pushQuad, bottom_points) {
+Tree.prototype.makeVines_ = function(vertices, pushQuad, bottom_points, model) {
 	var base_index = vertices.length,
 	    vert, norm = vec3.fromValues(0.0, 0.0, 1.0), uv,
 	    vert_2 = vec4.create();
@@ -324,9 +329,9 @@ Tree.prototype.makeVines_ = function(vertices, pushQuad, bottom_points) {
 
 	for (var segment = 0; segment < bottom_points.length; segment++) {
 		vert = vec4.clone(bottom_points[segment]);
-		vertices.push(new Vertex(vert, norm, vec2.fromValues(0.75, segment)));
+		vertices.push(new Vertex(vert, norm, vec2.fromValues(0.75, segment), model));
 		vec4.add(vert_2, vert, vec4.fromValues(0.0, 0.0, -3.5, 0.0));
-		vertices.push(new Vertex(vec4.clone(vert_2), norm, vec2.fromValues(0.5, segment)));
+		vertices.push(new Vertex(vec4.clone(vert_2), norm, vec2.fromValues(0.5, segment), model));
 	}
 
 	for (var segment = 0; segment < bottom_points.length-1; segment++) {
@@ -340,7 +345,7 @@ Tree.prototype.makeVines_ = function(vertices, pushQuad, bottom_points) {
 };
 
 // Same for a branch
-Tree.prototype.makeBranch_ = function(vertices, pushTri, pushQuad, anchor, angle, _branch_lift) {
+Tree.prototype.makeBranch_ = function(vertices, pushTri, pushQuad, anchor, angle, _branch_lift, model) {
 	if (anchor.length < 2.0) return;
 	if (anchor.radius < MIN_RADIUS) return;
 
@@ -380,7 +385,7 @@ Tree.prototype.makeBranch_ = function(vertices, pushTri, pushQuad, anchor, angle
 			vec4.transformMat4(vert, vert, mat);
 			vec4.add(vert, vert, core);
 			norm = vec4.fromValues(vert[0], 0.0, vert[2]);
-			vertices.push(new Vertex(vert, norm, vec2.fromValues(0.249, vert[1])));
+			vertices.push(new Vertex(vert, norm, vec2.fromValues(0.249, vert[1]), model));
 		} else {
 			for (var ring=0; ring<=radial_steps; ring++) {
 				if (ring == radial_steps || ring == 0) {
@@ -398,7 +403,7 @@ Tree.prototype.makeBranch_ = function(vertices, pushTri, pushQuad, anchor, angle
 				vec4.add(vert, vert, core);
 				norm = vec3.fromValues(vert[0], 0.0, vert[2]);
 				var uv = vec2.fromValues((ring / radial_steps) * 0.249, vert[1]);
-				vertices.push(new Vertex(vert, norm, uv));
+				vertices.push(new Vertex(vert, norm, uv, model));
 			}
 		}
 		underside_vertices.push(vert);
@@ -428,9 +433,9 @@ Tree.prototype.makeBranch_ = function(vertices, pushTri, pushQuad, anchor, angle
 
 	// grab the last point and use it as the origin for the foliage
 	var last_vertex = vertices[vertices.length - 1].vertex;
-	this.makeFoliage_(vertices, pushTri, pushQuad, last_vertex, anchor.length * 0.56, angle);
+	this.makeFoliage_(vertices, pushTri, pushQuad, last_vertex, anchor.length * 0.56, angle, model);
 
-	this.makeVines_(vertices, pushQuad, underside_vertices);
+	this.makeVines_(vertices, pushQuad, underside_vertices, model);
 }
 
 // Add vertices for this tree to the vertices list (each item is a list of vert,
@@ -456,7 +461,8 @@ Tree.prototype.Build = function(vertices, indices) {
 	    branches = [],
 	    vert, norm, uv,
 	    base_index = vertices.length,
-	    foliage_height;
+	    foliage_height,
+	    model = mat4.clone(this.model_);
 
 	for (var i=0; i<_current_branches; i++) {
 		var vertical_pos = _current_lowest_branch + i*branch_spacing;
@@ -495,7 +501,7 @@ Tree.prototype.Build = function(vertices, indices) {
 			vec4.add(vert, core, vec4.fromValues(x*core[3], y*core[3], 0.0, 0.0));
 			norm = vec3.fromValues(x, y, 0.0);
 			uv = vec2.fromValues((ring/STEPS)*0.249, core.z);
-			vertices.push(new Vertex(vert, norm, uv));
+			vertices.push(new Vertex(vert, norm, uv, model));
 		}
 	}
 
@@ -504,7 +510,7 @@ Tree.prototype.Build = function(vertices, indices) {
 	vert[3] = 0.0;
 	norm = vec3.fromValues(0.0, 0.0, 1.0);
 	uv = vec2.fromValues(0.0, 0.0);
-	var last_vert = new Vertex(vert, norm, uv);
+	var last_vert = new Vertex(vert, norm, uv, model);
 	vertices.push(last_vert);
 
 	var pushTri = function(index1, index2, index3) {
@@ -541,25 +547,17 @@ Tree.prototype.Build = function(vertices, indices) {
 		foliage_height = _current_height / 2;
 	}
 
-	this.makeFoliage_(vertices, pushTri, pushQuad, last_vert.vertex, foliage_height, 0.0);
+	this.makeFoliage_(vertices, pushTri, pushQuad, last_vert.vertex, foliage_height, 0.0, model);
 
 	for (var i=0; i<branches.length; i++) {
 		if (this.tree_type_ == TreeType.EVERGREEN) {
 			// just rings of foliage, no actual branches
 			var angle = i * (2*Math.PI / branches.length);
 			this.makeFoliage_(vertices, pushTri, pushQuad,
-					branches[i].root, branches[i].length, angle);
+					branches[i].root, branches[i].length, angle, model);
 		} else {
 			var angle = _current_angle_offset + i * ((2*Math.PI / branches.length) + Math.PI);
-			this.makeBranch_(vertices, pushTri, pushQuad, branches[i], angle, _branch_lift);
+			this.makeBranch_(vertices, pushTri, pushQuad, branches[i], angle, _branch_lift, model);
 		}
 	}
-
-	// This is a bit of a hack; all the "model" items weren't set above, so set
-	// them all here.  This will have to change (likely by passing model around)
-	// before the code will create multiple trees, but this works for now.
-	vertices.foreach(function(vertex) {
-			vertex.model = mat4.create();
-			mat4.rotateX(vertex.model, vertex.model, -Math.PI / 2);
-	});
 };

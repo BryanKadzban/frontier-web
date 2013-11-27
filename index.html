@@ -183,15 +183,26 @@
 				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
 				gl.generateMipmap(gl.TEXTURE_2D);
 				gl.bindTexture(gl.TEXTURE_2D, null);
+				// Add a couple useful accessors:
+				tex.width = img.width;
+				tex.height = img.height;
 			}
 
 			function initTextures(gl) {
-				tree = gl.createTexture();
-				treeImage = new Image();
-				treeImage.onload = function() { texLoaded(gl, treeImage, tree); }
-				treeImage.src = 'textures/bark1.bmp';
+				var bark = gl.createTexture(), foliage = gl.createTexture(), vine = gl.createTexture();
+				var barkImage = new Image(), foliageImage = new Image(), vineImage = new Image();
+				var textures = 3;
 
-				return [tree];
+				var cb = function() { if (--textures == 0) Tree.Setup(gl, [bark, foliage]); };
+
+				barkImage.onload = function() { texLoaded(gl, barkImage, bark); cb(); };
+				barkImage.src = 'textures/bark1.bmp';
+				foliageImage.onload = function() { texLoaded(gl, foliageImage, foliage); cb(); };
+				foliageImage.src = 'textures/foliage.png';
+				vineImage.onload = function() { texLoaded(gl, vineImage, vine); cb(); };
+				vineImage.src = 'textures/vines.png';
+
+				return [bark, foliage];
 			}
 
 			function start() {
@@ -338,6 +349,38 @@
 				model[3] = model3;
 				gl_Position = proj * view * model * vec4(pos, 1.0);
 				vUV = uv;
+			}
+		</script>
+		<script type="x-shader/x-vertex" id="texture-vshader">
+			#version 100
+
+			uniform mat4 proj;
+			attribute vec3 pos;
+			attribute vec4 color;
+			attribute vec2 uv;
+			varying lowp vec2 vUV;
+			varying lowp vec4 vColor;
+			void main(void) {
+				vec4 localpos;
+				localpos.xy = pos.xy;
+				localpos.z = pos.z - 10.0;
+				localpos.w = 1.0;
+				gl_Position = proj * localpos;
+				vUV = uv;
+				vColor = color;
+			}
+		</script>
+		<script type="x-shader/x-fragment" id="texture-fshader">
+			#version 100
+
+			varying lowp vec2 vUV;
+			varying lowp vec4 vColor;
+			uniform sampler2D tex;
+
+			void main(void) {
+				lowp vec4 texel = texture2D(tex, vUV);
+				// src_alpha, 1-src_alpha
+				gl_FragColor = mix(vColor, texel, texel.a);
 			}
 		</script>
 	</body>

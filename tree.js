@@ -45,6 +45,7 @@ function Tree(tree_type, foliage_type, funnel, trunk_type, position) {
 
 const SEGMENTS_PER_METER = 0.25;
 const MIN_RADIUS = 0.3;
+const TEXTURE_SIZE = 256;
 
 // Returns a vec4; first three entries are x,y,z of the center of the trunk at
 // the passed-in height, fourth entry is the radius at that point
@@ -437,6 +438,205 @@ Tree.prototype.makeBranch_ = function(vertices, pushTri, pushQuad, anchor, angle
 
 	this.makeVines_(vertices, pushQuad, underside_vertices, model);
 }
+
+Tree.drawBarkTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj) {
+	var dry_dirt = vec4.create(), wet_dirt = vec4.create(), cold_dirt = vec4.create(),
+	    warm_dirt = vec4.create(), bark = vec4.create(),
+	    moisture = 0.5, temperature = 0.5,
+	    color_f32 = new Float32Array(4 * 4),
+	    uv_f32 = new Float32Array(2 * 4),
+	    vert_f32 = new Float32Array(3 * 4),
+	    color_buf = gl.createBuffer(),
+	    uv_buf = gl.createBuffer(),
+	    vert_buf = gl.createBuffer();
+
+	dry_dirt[0] = 0.4 + 0.3;  // 0.4+randf*0.6
+	dry_dirt[1] = 0.1 + 0.25;  // 0.1+randf*0.5
+	dry_dirt[2] = 0.2 + 0.2;  // 0.2+randf*0.2
+	if (dry_dirt[2] < dry_dirt[1]) dry_dirt[2] = dry_dirt[1];
+
+	// fade = randf*0.6;
+	wet_dirt[0] = 0.2 + 0.3;
+	wet_dirt[1] = 0.1 + 0.3;
+	wet_dirt[1] += 0.05;  // randf*0.1
+	wet_dirt[2] = 0.0 + 0.15;
+
+	vec4.lerp(cold_dirt, wet_dirt, vec4.fromValues(0.7, 0.7, 0.7, 0.0), moisture);
+	vec4.lerp(warm_dirt, dry_dirt, wet_dirt, moisture);
+	vec4.lerp(bark, cold_dirt, warm_dirt, temperature);
+	vec4.scale(bark, bark, 0.5);
+	bark[3] = 1.0;
+
+	for (var i=0; i<4; i++) {
+		color_f32.subarray(i * 4).set(bark);
+	}
+
+	var frame_count = Math.floor(texObj.height / texObj.width);
+	if (frame_count < 1) frame_count = 1;
+	var frame_size = 1.0 / frame_count,
+	    frame = Math.floor(frame_count / 2),  // rand % frame_count
+	    uvTL = vec2.fromValues(0.0, frame * frame_size),
+	    uvTR = vec2.fromValues(1.0, frame * frame_size),
+	    uvBR = vec2.fromValues(1.0, (frame+1) * frame_size),
+	    uvBL = vec2.fromValues(0.0, (frame+1) * frame_size);
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, color_buf);
+	gl.bufferData(gl.ARRAY_BUFFER, color_f32, gl.STATIC_DRAW);
+	gl.vertexAttribPointer(colorAttr, 4, gl.FLOAT, false, 0, 0);
+
+	uv_f32.subarray(0).set(uvTL);
+	vert_f32.subarray(0).set(vec3.fromValues(0.0, 0.0, 0.0));
+
+	uv_f32.subarray(1 * 2).set(uvTR);
+	vert_f32.subarray(1 * 3).set(vec3.fromValues(TEXTURE_SIZE, 0.0, 0.0));
+
+	uv_f32.subarray(2 * 2).set(uvBR);
+	vert_f32.subarray(2 * 3).set(vec3.fromValues(TEXTURE_SIZE, TEXTURE_SIZE, 0.0));
+
+	uv_f32.subarray(3 * 2).set(uvBL);
+	vert_f32.subarray(3 * 3).set(vec3.fromValues(0.0, TEXTURE_SIZE, 0.0));
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, uv_buf);
+	gl.bufferData(gl.ARRAY_BUFFER, uv_f32, gl.STATIC_DRAW);
+	gl.vertexAttribPointer(uvAttr, 2, gl.FLOAT, false, 0, 0);
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, vert_buf);
+	gl.bufferData(gl.ARRAY_BUFFER, vert_f32, gl.STATIC_DRAW);
+	gl.vertexAttribPointer(posAttr, 3, gl.FLOAT, false, 0, 0);
+
+	// FAN because this vertex set was set up for QUADS, but that doesn't exist anymore,
+	// but FAN takes points in the same order for a quad.
+	gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+};
+
+Tree.drawLeafTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj) {
+	// TODO: actually implement this.  will take a bunch of work to add the leaf data structures first...
+};
+
+Tree.drawVineTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj) {
+	var dry_dirt = vec4.create(), wet_dirt = vec4.create(), cold_dirt = vec4.create(),
+	    warm_dirt = vec4.create(), bark = vec4.create(),
+	    moisture = 0.5, temperature = 0.5,
+	    color_f32 = new Float32Array(4 * 4),
+	    uv_f32 = new Float32Array(2 * 4),
+	    vert_f32 = new Float32Array(3 * 4),
+	    color_buf = gl.createBuffer(),
+	    uv_buf = gl.createBuffer(),
+	    vert_buf = gl.createBuffer();
+
+	dry_dirt[0] = 0.4 + 0.3;  // 0.4+randf*0.6
+	dry_dirt[1] = 0.1 + 0.25;  // 0.1+randf*0.5
+	dry_dirt[2] = 0.2 + 0.2;  // 0.2+randf*0.2
+	if (dry_dirt[2] < dry_dirt[1]) dry_dirt[2] = dry_dirt[1];
+
+	// fade = randf*0.6;
+	wet_dirt[0] = 0.2 + 0.3;
+	wet_dirt[1] = 0.1 + 0.3;
+	wet_dirt[1] += 0.05;  // randf*0.1
+	wet_dirt[2] = 0.0 + 0.15;
+
+	vec4.lerp(cold_dirt, wet_dirt, vec4.fromValues(0.7, 0.7, 0.7, 0.0), moisture);
+	vec4.lerp(warm_dirt, dry_dirt, wet_dirt, moisture);
+	vec4.lerp(bark, cold_dirt, warm_dirt, temperature);
+	vec4.scale(bark, bark, 0.5);
+	bark[3] = 1.0;
+
+	for (var i=0; i<4; i++) {
+		color_f32.subarray(i * 4).set(bark);
+	}
+
+	var frame_count = Math.floor(texObj.height / texObj.width);
+	if (frame_count < 1) frame_count = 1;
+	var frame_size = 1.0 / frame_count,
+	    frame = Math.floor(frame_count / 2),  // rand % frame_count
+	    uvTL = vec2.fromValues(0.0, frame * frame_size),
+	    uvTR = vec2.fromValues(1.0, frame * frame_size),
+	    uvBR = vec2.fromValues(1.0, (frame+1) * frame_size),
+	    uvBL = vec2.fromValues(0.0, (frame+1) * frame_size);
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, color_buf);
+	gl.bufferData(gl.ARRAY_BUFFER, color_f32, gl.STATIC_DRAW);
+	gl.vertexAttribPointer(colorAttr, 4, gl.FLOAT, false, 0, 0);
+
+	uv_f32.subarray(0).set(uvBL);
+	vert_f32.subarray(0).set(vec3.fromValues(0.0, 0.0, 0.0));
+
+	uv_f32.subarray(1 * 2).set(uvTL);
+	vert_f32.subarray(1 * 3).set(vec3.fromValues(TEXTURE_SIZE, 0.0, 0.0));
+
+	uv_f32.subarray(2 * 2).set(uvTR);
+	vert_f32.subarray(2 * 3).set(vec3.fromValues(TEXTURE_SIZE, TEXTURE_SIZE, 0.0));
+
+	uv_f32.subarray(3 * 2).set(uvBR);
+	vert_f32.subarray(3 * 3).set(vec3.fromValues(0.0, TEXTURE_SIZE, 0.0));
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, uv_buf);
+	gl.bufferData(gl.ARRAY_BUFFER, uv_f32, gl.STATIC_DRAW);
+	gl.vertexAttribPointer(uvAttr, 2, gl.FLOAT, false, 0, 0);
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, vert_buf);
+	gl.bufferData(gl.ARRAY_BUFFER, vert_f32, gl.STATIC_DRAW);
+	gl.vertexAttribPointer(posAttr, 3, gl.FLOAT, false, 0, 0);
+
+	// FAN because this vertex set was set up for QUADS, but that doesn't exist anymore,
+	// but FAN takes points in the same order for a quad.
+	gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+};
+
+// textures is an array of the raw textures; 0 is bark, 1 is foliage.
+Tree.Setup = function(gl, textures) {
+	var fb = gl.createFramebuffer(), fb_vshader = getShader(gl, 'texture-vshader'),
+	    fb_fshader = getShader(gl, 'texture-fshader'), prog = gl.createProgram();
+	gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+
+	gl.attachShader(prog, fb_vshader);
+	gl.attachShader(prog, fb_fshader);
+	gl.linkProgram(prog);
+
+	if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+		alert('Link of fb shader failed: ' + gl.getProgramInfoLog(prog));
+		return;
+	}
+
+	var old_shader = gl.getParameter(gl.CURRENT_PROGRAM);
+	gl.useProgram(prog);
+
+	var posAttr = gl.getAttribLocation(prog, 'pos'),
+	    colorAttr = gl.getAttribLocation(prog, 'color'),
+	    uvAttr = gl.getAttribLocation(prog, 'uv'),
+	    projAttr = gl.getUniformLocation(prog, 'proj'),
+	    texAttr = gl.getUniformLocation(prog, 'tex'),
+	    proj = mat4.create();
+	[posAttr, colorAttr, uvAttr].foreach(function(attr) {gl.enableVertexAttribArray(attr);});
+
+	mat4.ortho(proj, 0, TEXTURE_SIZE, 0, TEXTURE_SIZE, 0.1, 2048);
+	gl.uniformMatrix4fv(projAttr, false, proj);
+
+	tex = gl.createTexture();
+	gl.bindTexture(gl.TEXTURE_2D, tex);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, TEXTURE_SIZE*3, TEXTURE_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+	var vp = gl.getParameter(gl.VIEWPORT), color = gl.getParameter(gl.COLOR_CLEAR_VALUE);
+	gl.viewport(0, 0, TEXTURE_SIZE*3, TEXTURE_SIZE);
+	gl.clearColor(0.0, 0.0, 0.0, 0.0);
+	gl.clear(gl.COLOR_BUFFER_BIT);
+	gl.viewport(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+	Tree.drawBarkTexture_(gl, posAttr, colorAttr, uvAttr, texAttr, textures[0]);
+	gl.viewport(TEXTURE_SIZE, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+	Tree.drawLeafTexture_(gl, posAttr, colorAttr, uvAttr, texAttr, textures[1]);
+	gl.viewport(TEXTURE_SIZE*2, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+	Tree.drawVineTexture_(gl, posAttr, colorAttr, uvAttr, texAttr, textures[1]);
+
+	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+	gl.deleteFramebuffer(fb);
+
+	// restore state
+	gl.clearColor(color[0], color[1], color[2], color[3]);
+	gl.viewport(vp[0], vp[1], vp[2], vp[3]);
+	gl.useProgram(old_shader);
+};
 
 // Add vertices for this tree to the vertices list (each item is a list of vert,
 // norm, uv vectors, plus a model matrix), and indices list (each item is a

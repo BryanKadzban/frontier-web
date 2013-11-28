@@ -615,13 +615,14 @@ Tree.Setup = function(gl, textures) {
 	var old_tex = gl.getParameter(gl.TEXTURE_BINDING_2D),
 	    old_active_tex = gl.getParameter(gl.ACTIVE_TEXTURE),
 	    new_tex = gl.createTexture();
+	gl.activeTexture(gl.TEXTURE0);
 	gl.bindTexture(gl.TEXTURE_2D, new_tex);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, TEXTURE_SIZE*3, TEXTURE_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, TEXTURE_SIZE*4, TEXTURE_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, new_tex, 0);
 	var vp = gl.getParameter(gl.VIEWPORT), color = gl.getParameter(gl.COLOR_CLEAR_VALUE);
-	gl.viewport(0, 0, TEXTURE_SIZE*3, TEXTURE_SIZE);
+	gl.viewport(0, 0, TEXTURE_SIZE*4, TEXTURE_SIZE);
 	gl.clearColor(0.0, 0.0, 0.0, 0.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
 
@@ -631,11 +632,28 @@ Tree.Setup = function(gl, textures) {
 	gl.viewport(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
 	Tree.drawBarkTexture_(gl, posAttr, colorAttr, uvAttr, texAttr, textures[0]);
 	gl.bindTexture(gl.TEXTURE_2D, textures[1]);
+	gl.uniform1i(texAttr, 1);
 	gl.viewport(TEXTURE_SIZE, 0, TEXTURE_SIZE, TEXTURE_SIZE);
 	Tree.drawLeafTexture_(gl, posAttr, colorAttr, uvAttr, texAttr, textures[1]);
 	gl.bindTexture(gl.TEXTURE_2D, textures[2]);
+	gl.uniform1i(texAttr, 1);
 	gl.viewport(TEXTURE_SIZE*2, 0, TEXTURE_SIZE, TEXTURE_SIZE);
 	Tree.drawVineTexture_(gl, posAttr, colorAttr, uvAttr, texAttr, textures[2]);
+
+	// copy back out to 'texture' canvas, to see what's going on
+	{
+		var tex_canvas = document.getElementById('texture');
+		tex_canvas.width = TEXTURE_SIZE*4;
+		tex_canvas.height = TEXTURE_SIZE;
+		var ctx = tex_canvas.getContext('2d');
+		var imgdata = ctx.getImageData(0, 0, TEXTURE_SIZE*4, TEXTURE_SIZE);
+		var data = new Uint8Array(TEXTURE_SIZE*4 * TEXTURE_SIZE * 4);
+		gl.readPixels(0, 0, TEXTURE_SIZE*4, TEXTURE_SIZE, gl.RGBA, gl.UNSIGNED_BYTE, data);
+		for (var i=0; i<TEXTURE_SIZE*4 * TEXTURE_SIZE * 4; i++) {
+			imgdata.data[i] = data[i];
+		}
+		ctx.putImageData(imgdata, 0, 0);
+	}
 
 	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, null, 0);
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -648,7 +666,7 @@ Tree.Setup = function(gl, textures) {
 	gl.bindTexture(gl.TEXTURE_2D, old_tex);
 	gl.useProgram(old_shader);
 
-	Tree.texture_ = new_tex;
+	Tree.texture = new_tex;
 };
 
 // Add vertices for this tree to the vertices list (each item is a list of vert,

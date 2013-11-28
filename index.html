@@ -273,7 +273,8 @@
 				     [proj, view, tex]] = attributes,
 					[vertbuf, normbuf, uvbuf, indexbuf, modelbuf0, modelbuf1, modelbuf2,
 					 modelbuf3] = buffers,
-					[tree, foliage, vine] = textures;
+					[bark, foliage, vine] = textures,
+				    tree = Tree.texture;
 
 				// rotate around the scene once every few seconds
 				radians = ((timestamp - firsttimestamp) / 1000) * RADS_PER_SEC;
@@ -315,6 +316,8 @@
 		Your browser doesn't appear to support the HTML5 <code>&lt;canvas&gt;</code> element.
 		</canvas>
 		<p><span id="fps">???</span> FPS</p>
+		<canvas id="texture" width="256" height="256">
+		</canvas>
 		<script type="x-shader/x-vertex" id="vert-shader">
 			#version 100
 

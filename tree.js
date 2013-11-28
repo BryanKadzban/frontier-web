@@ -612,22 +612,30 @@ Tree.Setup = function(gl, textures) {
 	mat4.ortho(proj, 0, TEXTURE_SIZE, 0, TEXTURE_SIZE, 0.1, 2048);
 	gl.uniformMatrix4fv(projAttr, false, proj);
 
-	tex = gl.createTexture();
-	gl.bindTexture(gl.TEXTURE_2D, tex);
+	var old_tex = gl.getParameter(gl.TEXTURE_BINDING_2D),
+	    old_active_tex = gl.getParameter(gl.ACTIVE_TEXTURE),
+	    new_tex = gl.createTexture();
+	gl.bindTexture(gl.TEXTURE_2D, new_tex);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, TEXTURE_SIZE*3, TEXTURE_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, new_tex, 0);
 	var vp = gl.getParameter(gl.VIEWPORT), color = gl.getParameter(gl.COLOR_CLEAR_VALUE);
 	gl.viewport(0, 0, TEXTURE_SIZE*3, TEXTURE_SIZE);
 	gl.clearColor(0.0, 0.0, 0.0, 0.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
+
+	gl.activeTexture(gl.TEXTURE1);
+	gl.bindTexture(gl.TEXTURE_2D, textures[0]);
+	gl.uniform1i(texAttr, 1);
 	gl.viewport(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
 	Tree.drawBarkTexture_(gl, posAttr, colorAttr, uvAttr, texAttr, textures[0]);
+	gl.bindTexture(gl.TEXTURE_2D, textures[1]);
 	gl.viewport(TEXTURE_SIZE, 0, TEXTURE_SIZE, TEXTURE_SIZE);
 	Tree.drawLeafTexture_(gl, posAttr, colorAttr, uvAttr, texAttr, textures[1]);
+	gl.bindTexture(gl.TEXTURE_2D, textures[2]);
 	gl.viewport(TEXTURE_SIZE*2, 0, TEXTURE_SIZE, TEXTURE_SIZE);
-	Tree.drawVineTexture_(gl, posAttr, colorAttr, uvAttr, texAttr, textures[1]);
+	Tree.drawVineTexture_(gl, posAttr, colorAttr, uvAttr, texAttr, textures[2]);
 
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 	gl.deleteFramebuffer(fb);
@@ -635,6 +643,8 @@ Tree.Setup = function(gl, textures) {
 	// restore state
 	gl.clearColor(color[0], color[1], color[2], color[3]);
 	gl.viewport(vp[0], vp[1], vp[2], vp[3]);
+	gl.activeTexture(old_active_tex);
+	gl.bindTexture(gl.TEXTURE_2D, old_tex);
 	gl.useProgram(old_shader);
 };
 

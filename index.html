@@ -193,7 +193,7 @@
 				var barkImage = new Image(), foliageImage = new Image(), vineImage = new Image();
 				var textures = 3;
 
-				var cb = function() { if (--textures == 0) Tree.Setup(gl, [bark, foliage]); };
+				var cb = function() { if (--textures == 0) Tree.Setup(gl, [bark, foliage, vine]); };
 
 				barkImage.onload = function() { texLoaded(gl, barkImage, bark); cb(); };
 				barkImage.src = 'textures/bark1.bmp';
@@ -273,7 +273,7 @@
 				     [proj, view, tex]] = attributes,
 					[vertbuf, normbuf, uvbuf, indexbuf, modelbuf0, modelbuf1, modelbuf2,
 					 modelbuf3] = buffers,
-					[tree] = textures;
+					[tree, foliage, vine] = textures;
 
 				// rotate around the scene once every few seconds
 				radians = ((timestamp - firsttimestamp) / 1000) * RADS_PER_SEC;

@@ -637,6 +637,7 @@ Tree.Setup = function(gl, textures) {
 	gl.viewport(TEXTURE_SIZE*2, 0, TEXTURE_SIZE, TEXTURE_SIZE);
 	Tree.drawVineTexture_(gl, posAttr, colorAttr, uvAttr, texAttr, textures[2]);
 
+	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, null, 0);
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 	gl.deleteFramebuffer(fb);
 
@@ -646,6 +647,8 @@ Tree.Setup = function(gl, textures) {
 	gl.activeTexture(old_active_tex);
 	gl.bindTexture(gl.TEXTURE_2D, old_tex);
 	gl.useProgram(old_shader);
+
+	Tree.texture_ = new_tex;
 };
 
 // Add vertices for this tree to the vertices list (each item is a list of vert,

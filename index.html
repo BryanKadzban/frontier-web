@@ -54,7 +54,7 @@
 				gl.compileShader(shader);
 
 				if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-					alert('Error compiling shaders: ' + gl.getShaderInfoLog(shader));
+					alert('Error compiling ' + id + ' shader: ' + gl.getShaderInfoLog(shader));
 					return null;
 				}
 

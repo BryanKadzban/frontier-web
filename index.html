@@ -315,17 +315,6 @@
 		Your browser doesn't appear to support the HTML5 <code>&lt;canvas&gt;</code> element.
 		</canvas>
 		<p><span id="fps">???</span> FPS</p>
-		<script type="x-shader/x-fragment" id="frag-shader">
-			#version 100
-
-			varying lowp vec2 vUV;
-
-			uniform sampler2D texture;
-
-			void main(void) {
-				gl_FragColor = texture2D(texture, vUV);
-			}
-		</script>
 		<script type="x-shader/x-vertex" id="vert-shader">
 			#version 100
 
@@ -349,6 +338,17 @@
 				model[3] = model3;
 				gl_Position = proj * view * model * vec4(pos, 1.0);
 				vUV = uv;
+			}
+		</script>
+		<script type="x-shader/x-fragment" id="frag-shader">
+			#version 100
+
+			varying lowp vec2 vUV;
+
+			uniform sampler2D texture;
+
+			void main(void) {
+				gl_FragColor = texture2D(texture, vUV);
 			}
 		</script>
 		<script type="x-shader/x-vertex" id="texture-vshader">

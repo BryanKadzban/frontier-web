@@ -463,7 +463,7 @@ Tree.drawBarkTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj
 	var frame_count = Math.floor(texObj.height / texObj.width);
 	if (frame_count < 1) frame_count = 1;
 	var frame_size = 1.0 / frame_count,
-	    frame = 0, //Math.floor(frame_count / 2),  // rand % frame_count
+	    frame = Math.floor(frame_count / 2),  // rand % frame_count
 	    uvTL = vec2.fromValues(0.0, frame * frame_size),
 	    uvTR = vec2.fromValues(1.0, frame * frame_size),
 	    uvBR = vec2.fromValues(1.0, (frame+1) * frame_size),
@@ -503,10 +503,10 @@ Tree.drawLeafTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj
 
 	if (1 /* TREE_LEAF_FAN */) {
 		var total_steps = 5, size, step_size, leaf;
-		for (var current_step = total_steps; current_step > 1; current_step--) {
+		for (var current_step = total_steps; current_step >= 1; current_step--) {
 			size = (TEXTURE_SIZE / 4) / (1.0 + (total_steps - current_step));
 			step_size = 2*Math.PI / current_step;
-			for (var x = 0; x < Math.PI; x += step_size) {
+			for (var x = 0; x < 2*Math.PI; x += step_size) {
 				var pos = vec2.fromValues(
 					TEXTURE_SIZE / 2 + Math.cos(x)*size,
 					TEXTURE_SIZE / 2 + Math.sin(x)*size
@@ -519,25 +519,27 @@ Tree.drawLeafTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj
 	}
 
 	leaves.foreach(function(leaf) {
-		vec4.lerp(leaf.color, leaf_color, vec4.fromValues(0, 0.5, 0, 0), Math.random() * 0.33);
+		vec4.lerp(leaf.color, leaf_color, vec4.fromValues(0, 0.5, 0, 1), Math.random() * 0.33);
 	});
 
 	if (0  /* TREE_LEAF_SCATTER */) {
 		// TODO: implement
 	}
 
-	var color_f32 = new Float32Array(4 * 4 * leaves.length),
-	    uv_f32 = new Float32Array(2 * 4 * leaves.length),
-	    vert_f32 = new Float32Array(3 * 4 * leaves.length),
+	var color_f32 = new Float32Array(4 * 6 * leaves.length),
+	    uv_f32 = new Float32Array(2 * 6 * leaves.length),
+	    vert_f32 = new Float32Array(3 * 6 * leaves.length),
 	    color_buf = gl.createBuffer(),
 	    uv_buf = gl.createBuffer(),
 	    vert_buf = gl.createBuffer();
 
 	leaves.foreach(function(leaf, i) {
-		color_f32.subarray(i * 4 * 4).set(leaf.color);
-		color_f32.subarray(i * 4 * 4 + 4).set(leaf.color);
-		color_f32.subarray(i * 4 * 4 + 8).set(leaf.color);
-		color_f32.subarray(i * 4 * 4 + 12).set(leaf.color);
+		color_f32.subarray(i * 6 * 4).set(leaf.color);
+		color_f32.subarray(i * 6 * 4 + 4).set(leaf.color);
+		color_f32.subarray(i * 6 * 4 + 8).set(leaf.color);
+		color_f32.subarray(i * 6 * 4 + 12).set(leaf.color);
+		color_f32.subarray(i * 6 * 4 + 16).set(leaf.color);
+		color_f32.subarray(i * 6 * 4 + 20).set(leaf.color);
 	});
 
 	gl.bindBuffer(gl.ARRAY_BUFFER, color_buf);
@@ -557,8 +559,10 @@ Tree.drawLeafTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj
 		var pos = vec3.fromValues(leaf.position[0], leaf.position[1], 0.0),
 		    rotation = mat3.create(),
 		    posTL = vec3.create(), posTR = vec3.create(), posBR = vec3.create(),
-		    posBL = vec3.create();
+		    posBL = vec3.create(), invpos = vec3.fromValues(-pos[0], -pos[1], -pos[2]);
+		mat3.translate(rotation, rotation, pos);
 		mat3.rotate(rotation, rotation, leaf.angle);
+		mat3.translate(rotation, rotation, invpos);
 		// Note, this only works because a vec3 embeds a vec2
 		vec2.add(posTL, pos, vec2.fromValues(-leaf.size, -leaf.size));
 		vec2.transformMat3(posTL, posTL, rotation);
@@ -569,17 +573,23 @@ Tree.drawLeafTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj
 		vec2.add(posBL, pos, vec2.fromValues(-leaf.size, leaf.size));
 		vec2.transformMat3(posBL, posBL, rotation);
 
-		uv_f32.subarray(i * 2 * 4).set(uvTL);
-		vert_f32.subarray(i * 3 * 4).set(posTL);
+		uv_f32.subarray(i * 6 * 2).set(uvTL);
+		vert_f32.subarray(i * 6 * 3).set(posTL);
 
-		uv_f32.subarray(i * 2 * 4 + 2).set(uvTR);
-		vert_f32.subarray(i * 3 * 4 + 3).set(posTR);
+		uv_f32.subarray(i * 6 * 2 + 2).set(uvTR);
+		vert_f32.subarray(i * 6 * 3 + 3).set(posTR);
 
-		uv_f32.subarray(i * 2 * 4 + 4).set(uvBR);
-		vert_f32.subarray(i * 3 * 4 + 6).set(posBR);
+		uv_f32.subarray(i * 6 * 2 + 4).set(uvBR);
+		vert_f32.subarray(i * 6 * 3 + 6).set(posBR);
 
-		uv_f32.subarray(i * 2 * 4 + 6).set(uvBL);
-		vert_f32.subarray(i * 3 * 4 + 9).set(posBL);
+		uv_f32.subarray(i * 6 * 2 + 6).set(uvBR);
+		vert_f32.subarray(i * 6 * 3 + 9).set(posBR);
+
+		uv_f32.subarray(i * 6 * 2 + 8).set(uvBL);
+		vert_f32.subarray(i * 6 * 3 + 12).set(posBL);
+
+		uv_f32.subarray(i * 6 * 2 + 10).set(uvTL);
+		vert_f32.subarray(i * 6 * 3 + 15).set(posTL);
 	});
 
 	gl.bindBuffer(gl.ARRAY_BUFFER, uv_buf);
@@ -590,9 +600,9 @@ Tree.drawLeafTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj
 	gl.bufferData(gl.ARRAY_BUFFER, vert_f32, gl.STATIC_DRAW);
 	gl.vertexAttribPointer(posAttr, 3, gl.FLOAT, false, 0, 0);
 
-	// FAN because this vertex set was set up for QUADS, but that doesn't exist anymore,
-	// but FAN takes points in the same order for a quad.
-	gl.drawArrays(gl.TRIANGLE_FAN, 0, 4 * leaves.length);
+	// Can't use TRIANGLE_FAN here because there's more than one quad.  :-/  Have to
+	// split the quads into individual triangles instead, or use multiple draw calls.
+	gl.drawArrays(gl.TRIANGLES, 0, 6 * leaves.length);
 };
 
 Tree.drawVineTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj, leaf_color) {
@@ -645,7 +655,7 @@ Tree.drawVineTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj
 	gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 };
 
-// textures is an array of the raw textures; 0 is bark, 1 is foliage.
+// textures is an array of the raw textures; 0 is bark, 1 is foliage, 2 is vine.
 Tree.Setup = function(gl, textures) {
 	var fb = gl.createFramebuffer(), fb_vshader = getShader(gl, 'texture-vshader'),
 	    fb_fshader = getShader(gl, 'texture-fshader'), prog = gl.createProgram(),
@@ -719,10 +729,14 @@ Tree.Setup = function(gl, textures) {
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, TEXTURE_SIZE*4, TEXTURE_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, new_tex, 0);
-	var vp = gl.getParameter(gl.VIEWPORT), color = gl.getParameter(gl.COLOR_CLEAR_VALUE);
+	var vp = gl.getParameter(gl.VIEWPORT), color = gl.getParameter(gl.COLOR_CLEAR_VALUE),
+	    blend = gl.getParameter(gl.BLEND);
 	gl.viewport(0, 0, TEXTURE_SIZE*4, TEXTURE_SIZE);
 	gl.clearColor(0.0, 0.0, 0.0, 0.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
+
+	gl.enable(gl.BLEND);
+	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
 	gl.activeTexture(gl.TEXTURE1);
 	gl.bindTexture(gl.TEXTURE_2D, textures[0]);
@@ -763,6 +777,7 @@ Tree.Setup = function(gl, textures) {
 	gl.activeTexture(old_active_tex);
 	gl.bindTexture(gl.TEXTURE_2D, old_tex);
 	gl.useProgram(old_shader);
+	if (!blend) gl.disable(gl.BLEND);
 
 	Tree.texture = new_tex;
 };

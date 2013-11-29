@@ -108,7 +108,7 @@
 				var pos2 = vec3.fromValues(20.0, 20.0, 0.0);
 				var pos3 = vec3.fromValues(0.0, 0.0, 0.0);
 				var tree = new Tree(TreeType.EVERGREEN, FoliageType.UMBRELLA, false, BranchType.NORMAL, pos);
-				var tree2 = new Tree(TreeType.EVERGREEN, FoliageType.UMBRELLA, false, BranchType.NORMAL, pos2);
+				var tree2 = new Tree(TreeType.NORMAL, FoliageType.UMBRELLA, false, BranchType.NORMAL, pos2);
 				var tree3 = new Tree(TreeType.CANOPY, FoliageType.UMBRELLA, false, BranchType.NORMAL, pos3);
 				tree.Build(vertices, indices);
 				tree2.Build(vertices, indices);
@@ -232,6 +232,9 @@
 				mat4.translate(vm, vm, vec3.fromValues(0, -8, -70));
 				pm = mat4.perspective(mat4.create(), Math.PI/4, 800.0/600.0, 0.1, 150);
 
+				gl.enable(gl.BLEND);
+				gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
 				// Do I really need this extra scope?  Eh, why not.
 				(function() {
 					var requestAnimationFrame = (window.requestAnimationFrame ||
@@ -315,7 +318,7 @@
 		<canvas id="glcanvas" width="800" height="600">
 		Your browser doesn't appear to support the HTML5 <code>&lt;canvas&gt;</code> element.
 		</canvas>
-		<p><span id="fps">???</span> FPS</p>
+		<p><span id="fps">???</span> FPS, <span id="debug"></span></p>
 		<canvas id="texture" width="256" height="256">
 		</canvas>
 		<script type="x-shader/x-vertex" id="vert-shader">

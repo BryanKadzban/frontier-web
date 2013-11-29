@@ -382,8 +382,8 @@
 
 			void main(void) {
 				lowp vec4 texel = texture2D(tex, vUV);
-				// src_alpha, 1-src_alpha
-				gl_FragColor = mix(vColor, texel, texel.a);
+				// emulate the old fixed-function pipeline's blending
+				gl_FragColor = vColor * texel;
 			}
 		</script>
 	</body>

@@ -28,6 +28,15 @@ var FoliageType = Object.freeze({
 
 // gl-matrix.js or gl-matrix-min.js must be evaluated before this file
 
+function Leaf(size, position, angle, color, dist, neighbor) {
+	this.size = size;
+	this.position = position;
+	this.angle = angle;
+	this.color = color;
+	this.dist = dist;
+	this.neighbor = neighbor;
+}
+
 function Tree(tree_type, foliage_type, funnel, trunk_type, position) {
 	this.tree_type_ = tree_type;
 	this.foliage_type_ = foliage_type;
@@ -439,36 +448,16 @@ Tree.prototype.makeBranch_ = function(vertices, pushTri, pushQuad, anchor, angle
 	this.makeVines_(vertices, pushQuad, underside_vertices, model);
 }
 
-Tree.drawBarkTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj) {
-	var dry_dirt = vec4.create(), wet_dirt = vec4.create(), cold_dirt = vec4.create(),
-	    warm_dirt = vec4.create(), bark = vec4.create(),
-	    moisture = 0.5, temperature = 0.5,
-	    color_f32 = new Float32Array(4 * 4),
+Tree.drawBarkTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj, bark_color) {
+	var color_f32 = new Float32Array(4 * 4),
 	    uv_f32 = new Float32Array(2 * 4),
 	    vert_f32 = new Float32Array(3 * 4),
 	    color_buf = gl.createBuffer(),
 	    uv_buf = gl.createBuffer(),
 	    vert_buf = gl.createBuffer();
 
-	dry_dirt[0] = 0.4 + 0.3;  // 0.4+randf*0.6
-	dry_dirt[1] = 0.1 + 0.25;  // 0.1+randf*0.5
-	dry_dirt[2] = 0.2 + 0.2;  // 0.2+randf*0.2
-	if (dry_dirt[2] < dry_dirt[1]) dry_dirt[2] = dry_dirt[1];
-
-	// fade = randf*0.6;
-	wet_dirt[0] = 0.2 + 0.3;
-	wet_dirt[1] = 0.1 + 0.3;
-	wet_dirt[1] += 0.05;  // randf*0.1
-	wet_dirt[2] = 0.0 + 0.15;
-
-	vec4.lerp(cold_dirt, wet_dirt, vec4.fromValues(0.7, 0.7, 0.7, 0.0), moisture);
-	vec4.lerp(warm_dirt, dry_dirt, wet_dirt, moisture);
-	vec4.lerp(bark, cold_dirt, warm_dirt, temperature);
-	vec4.scale(bark, bark, 0.5);
-	bark[3] = 1.0;
-
 	for (var i=0; i<4; i++) {
-		color_f32.subarray(i * 4).set(bark);
+		color_f32.subarray(i * 4).set(bark_color);
 	}
 
 	var frame_count = Math.floor(texObj.height / texObj.width);
@@ -509,40 +498,39 @@ Tree.drawBarkTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj
 	gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 };
 
-Tree.drawLeafTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj) {
-	// TODO: actually implement this.  will take a bunch of work to add the leaf data structures first...
+Tree.drawLeafTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj, leaf_color) {
+	var leaves = [];
+
+	if (1 /* TREE_LEAF_FAN */) {
+		var total_steps = 5, size, radius, step_size, leaf;
+		for (var current_step = total_steps; current_step > 1; current_step--) {
+			size = (TEXTURE_SIZE / 4) / (1.0 + (total_steps - current_step));
+			radius = (TEXTURE_SIZE / 2 - 2*size);
+			step_size = 2*Math.PI / current_step;
+			for (var x = 0; x < Math.PI; x += step_size) {
+				var pos = vec2.fromValues(
+					TEXTURE_SIZE / 2 + Math.cos(x)*size,
+					TEXTURE_SIZE / 2 + Math.sin(x)*size
+				);
+				leaves.push(new Leaf(size, pos, x, vec4.create(), 0, 0));
+			}
+		}
+	} else {
+		// TODO: implement
+	}
+	leaves.foreach(function(leaf) { vec4.lerp(leaf.color, leaf_color, vec4.fromValues(0, 0.5, 0, 0), Math.random() * 0.33); });
 };
 
-Tree.drawVineTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj) {
-	var dry_dirt = vec4.create(), wet_dirt = vec4.create(), cold_dirt = vec4.create(),
-	    warm_dirt = vec4.create(), bark = vec4.create(),
-	    moisture = 0.5, temperature = 0.5,
-	    color_f32 = new Float32Array(4 * 4),
+Tree.drawVineTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj, leaf_color) {
+	var color_f32 = new Float32Array(4 * 4),
 	    uv_f32 = new Float32Array(2 * 4),
 	    vert_f32 = new Float32Array(3 * 4),
 	    color_buf = gl.createBuffer(),
 	    uv_buf = gl.createBuffer(),
 	    vert_buf = gl.createBuffer();
 
-	dry_dirt[0] = 0.4 + 0.3;  // 0.4+randf*0.6
-	dry_dirt[1] = 0.1 + 0.25;  // 0.1+randf*0.5
-	dry_dirt[2] = 0.2 + 0.2;  // 0.2+randf*0.2
-	if (dry_dirt[2] < dry_dirt[1]) dry_dirt[2] = dry_dirt[1];
-
-	// fade = randf*0.6;
-	wet_dirt[0] = 0.2 + 0.3;
-	wet_dirt[1] = 0.1 + 0.3;
-	wet_dirt[1] += 0.05;  // randf*0.1
-	wet_dirt[2] = 0.0 + 0.15;
-
-	vec4.lerp(cold_dirt, wet_dirt, vec4.fromValues(0.7, 0.7, 0.7, 0.0), moisture);
-	vec4.lerp(warm_dirt, dry_dirt, wet_dirt, moisture);
-	vec4.lerp(bark, cold_dirt, warm_dirt, temperature);
-	vec4.scale(bark, bark, 0.5);
-	bark[3] = 1.0;
-
 	for (var i=0; i<4; i++) {
-		color_f32.subarray(i * 4).set(bark);
+		color_f32.subarray(i * 4).set(leaf_color);
 	}
 
 	var frame_count = Math.floor(texObj.height / texObj.width);
@@ -586,7 +574,43 @@ Tree.drawVineTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj
 // textures is an array of the raw textures; 0 is bark, 1 is foliage.
 Tree.Setup = function(gl, textures) {
 	var fb = gl.createFramebuffer(), fb_vshader = getShader(gl, 'texture-vshader'),
-	    fb_fshader = getShader(gl, 'texture-fshader'), prog = gl.createProgram();
+	    fb_fshader = getShader(gl, 'texture-fshader'), prog = gl.createProgram(),
+	    moisture = 0.5, temperature = 0.5,
+	    leaf_color = vec4.create(), bark_color = vec4.create(),
+	    wet_grass = vec4.fromValues(0.15, 0.4+0.3, 0.15, 1.0),
+	    dry_grass = vec4.fromValues(0.7 + 0.15, 0.5 + 0.25, 0.15, 1.0),
+	    dead_grass = vec4.fromValues(0.7, 0.6, 0.5, 1.0),
+	    warm_grass = vec4.create(),
+	    cold_grass = vec4.fromValues(0.5 + 0.1, 0.8 + 0.1, 0.7 + 0.1, 1.0),
+	    dry_dirt = vec4.create(), wet_dirt = vec4.create(), cold_dirt = vec4.create(),
+	    warm_dirt = vec4.create();
+	const TEMP_COLD = 0.45;
+
+	vec4.lerp(warm_grass, dry_grass, wet_grass, moisture);
+
+	if (temperature < TEMP_COLD) {
+		vec4.lerp(leaf_color, cold_grass, warm_grass, temperature / TEMP_COLD);
+	} else {
+		vec4.copy(leaf_color, warm_grass);
+	}
+
+	dry_dirt[0] = 0.4 + 0.3;  // 0.4+randf*0.6
+	dry_dirt[1] = 0.1 + 0.25;  // 0.1+randf*0.5
+	dry_dirt[2] = 0.2 + 0.2;  // 0.2+randf*0.2
+	if (dry_dirt[2] < dry_dirt[1]) dry_dirt[2] = dry_dirt[1];
+
+	// fade = randf*0.6;
+	wet_dirt[0] = 0.2 + 0.3;
+	wet_dirt[1] = 0.1 + 0.3;
+	wet_dirt[1] += 0.05;  // randf*0.1
+	wet_dirt[2] = 0.0 + 0.15;
+
+	vec4.lerp(cold_dirt, wet_dirt, vec4.fromValues(0.7, 0.7, 0.7, 0.0), moisture);
+	vec4.lerp(warm_dirt, dry_dirt, wet_dirt, moisture);
+	vec4.lerp(bark_color, cold_dirt, warm_dirt, temperature);
+	vec4.scale(bark_color, bark_color, 0.5);
+	bark_color[3] = 1.0;
+
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
 
 	gl.attachShader(prog, fb_vshader);
@@ -630,15 +654,15 @@ Tree.Setup = function(gl, textures) {
 	gl.bindTexture(gl.TEXTURE_2D, textures[0]);
 	gl.uniform1i(texAttr, 1);
 	gl.viewport(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
-	Tree.drawBarkTexture_(gl, posAttr, colorAttr, uvAttr, texAttr, textures[0]);
+	Tree.drawBarkTexture_(gl, posAttr, colorAttr, uvAttr, texAttr, textures[0], bark_color);
 	gl.bindTexture(gl.TEXTURE_2D, textures[1]);
 	gl.uniform1i(texAttr, 1);
 	gl.viewport(TEXTURE_SIZE, 0, TEXTURE_SIZE, TEXTURE_SIZE);
-	Tree.drawLeafTexture_(gl, posAttr, colorAttr, uvAttr, texAttr, textures[1]);
+	Tree.drawLeafTexture_(gl, posAttr, colorAttr, uvAttr, texAttr, textures[1], leaf_color);
 	gl.bindTexture(gl.TEXTURE_2D, textures[2]);
 	gl.uniform1i(texAttr, 1);
 	gl.viewport(TEXTURE_SIZE*2, 0, TEXTURE_SIZE, TEXTURE_SIZE);
-	Tree.drawVineTexture_(gl, posAttr, colorAttr, uvAttr, texAttr, textures[2]);
+	Tree.drawVineTexture_(gl, posAttr, colorAttr, uvAttr, texAttr, textures[2], leaf_color);
 
 	// copy back out to 'texture' canvas, to see what's going on
 	{

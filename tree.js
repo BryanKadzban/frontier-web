@@ -502,10 +502,9 @@ Tree.drawLeafTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj
 	var leaves = [];
 
 	if (1 /* TREE_LEAF_FAN */) {
-		var total_steps = 5, size, radius, step_size, leaf;
+		var total_steps = 5, size, step_size, leaf;
 		for (var current_step = total_steps; current_step > 1; current_step--) {
 			size = (TEXTURE_SIZE / 4) / (1.0 + (total_steps - current_step));
-			radius = (TEXTURE_SIZE / 2 - 2*size);
 			step_size = 2*Math.PI / current_step;
 			for (var x = 0; x < Math.PI; x += step_size) {
 				var pos = vec2.fromValues(
@@ -518,7 +517,79 @@ Tree.drawLeafTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj
 	} else {
 		// TODO: implement
 	}
-	leaves.foreach(function(leaf) { vec4.lerp(leaf.color, leaf_color, vec4.fromValues(0, 0.5, 0, 0), Math.random() * 0.33); });
+
+	leaves.foreach(function(leaf) {
+		vec4.lerp(leaf.color, leaf_color, vec4.fromValues(0, 0.5, 0, 0), Math.random() * 0.33);
+	});
+
+	if (0  /* TREE_LEAF_SCATTER */) {
+		// TODO: implement
+	}
+
+	var color_f32 = new Float32Array(4 * 4 * leaves.length),
+	    uv_f32 = new Float32Array(2 * 4 * leaves.length),
+	    vert_f32 = new Float32Array(3 * 4 * leaves.length),
+	    color_buf = gl.createBuffer(),
+	    uv_buf = gl.createBuffer(),
+	    vert_buf = gl.createBuffer();
+
+	for (var i=0; i<4*leaves.length; i++) {
+		color_f32.subarray(i * 4).set(leaf_color);
+	}
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, color_buf);
+	gl.bufferData(gl.ARRAY_BUFFER, color_f32, gl.STATIC_DRAW);
+	gl.vertexAttribPointer(colorAttr, 4, gl.FLOAT, false, 0, 0);
+
+	var frame_count = Math.floor(texObj.height / texObj.width);
+	if (frame_count < 1) frame_count = 1;
+	var frame_size = 1.0 / frame_count,
+	    frame = Math.floor(frame_count / 2),  // rand % frame_count
+	    uvTL = vec2.fromValues(0.0, frame * frame_size),
+	    uvTR = vec2.fromValues(1.0, frame * frame_size),
+	    uvBR = vec2.fromValues(1.0, (frame+1) * frame_size),
+	    uvBL = vec2.fromValues(0.0, (frame+1) * frame_size);
+
+	leaves.foreach(function(leaf, i) {
+		var pos = vec3.fromValues(leaf.position[0], leaf.position[1], 0.0),
+		    rotation = mat3.create(),
+		    posTL = vec3.create(), posTR = vec3.create(), posBR = vec3.create(),
+		    posBL = vec3.create();
+		mat3.rotate(rotation, rotation, leaf.angle);
+		// Note, this only works because a vec3 embeds a vec2
+		vec2.add(posTL, pos, vec2.fromValues(-leaf.size, -leaf.size));
+		vec2.transformMat3(posTL, posTL, rotation);
+		vec2.add(posTR, pos, vec2.fromValues(leaf.size, -leaf.size));
+		vec2.transformMat3(posTR, posTR, rotation);
+		vec2.add(posBR, pos, vec2.fromValues(leaf.size, leaf.size));
+		vec2.transformMat3(posBR, posBR, rotation);
+		vec2.add(posBL, pos, vec2.fromValues(-leaf.size, leaf.size));
+		vec2.transformMat3(posBL, posBL, rotation);
+
+		uv_f32.subarray(i * 2 * 4).set(uvTL);
+		vert_f32.subarray(i * 3 * 4).set(posTL);
+
+		uv_f32.subarray(i * 2 * 4 + 2).set(uvTR);
+		vert_f32.subarray(i * 3 * 4 + 3).set(posTR);
+
+		uv_f32.subarray(i * 2 * 4 + 4).set(uvBR);
+		vert_f32.subarray(i * 3 * 4 + 6).set(posBR);
+
+		uv_f32.subarray(i * 2 * 4 + 6).set(uvBL);
+		vert_f32.subarray(i * 3 * 4 + 9).set(posBL);
+	});
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, uv_buf);
+	gl.bufferData(gl.ARRAY_BUFFER, uv_f32, gl.STATIC_DRAW);
+	gl.vertexAttribPointer(uvAttr, 2, gl.FLOAT, false, 0, 0);
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, vert_buf);
+	gl.bufferData(gl.ARRAY_BUFFER, vert_f32, gl.STATIC_DRAW);
+	gl.vertexAttribPointer(posAttr, 3, gl.FLOAT, false, 0, 0);
+
+	// FAN because this vertex set was set up for QUADS, but that doesn't exist anymore,
+	// but FAN takes points in the same order for a quad.
+	gl.drawArrays(gl.TRIANGLE_FAN, 0, 4 * leaves.length);
 };
 
 Tree.drawVineTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj, leaf_color) {

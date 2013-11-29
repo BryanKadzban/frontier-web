@@ -15,7 +15,7 @@
 				if (limit === undefined) limit = this.length;
 
 				for (var i=start; i<limit; i++) {
-					fn(this[i]);
+					fn(this[i], i);
 				}
 			}
 

@@ -533,9 +533,12 @@ Tree.drawLeafTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj
 	    uv_buf = gl.createBuffer(),
 	    vert_buf = gl.createBuffer();
 
-	for (var i=0; i<4*leaves.length; i++) {
-		color_f32.subarray(i * 4).set(leaf_color);
-	}
+	leaves.foreach(function(leaf, i) {
+		color_f32.subarray(i * 4 * 4).set(leaf.color);
+		color_f32.subarray(i * 4 * 4 + 4).set(leaf.color);
+		color_f32.subarray(i * 4 * 4 + 8).set(leaf.color);
+		color_f32.subarray(i * 4 * 4 + 12).set(leaf.color);
+	});
 
 	gl.bindBuffer(gl.ARRAY_BUFFER, color_buf);
 	gl.bufferData(gl.ARRAY_BUFFER, color_f32, gl.STATIC_DRAW);

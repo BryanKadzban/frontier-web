@@ -5,8 +5,8 @@
 		<script src="tree.js"></script>
 		<script>
 			var gl;
-			var buffers;  // vertex, norm, uv, index, model0, model1, model2, model3
-			var attributes;  // [pos, uv, model0, model1, model2, model3], [proj, view, tex]
+			var buffers = {};
+			var attributes = {};
 			var textures;  // [tree]
 			var vm, pm;
 
@@ -78,27 +78,30 @@
 
 				gl.useProgram(prog);
 
-				var posAttr = gl.getAttribLocation(prog, 'pos');
-				gl.enableVertexAttribArray(posAttr);
+				var attrs = {
+					attrs: {
+						pos: gl.getAttribLocation(prog, 'pos'),
+						uv: gl.getAttribLocation(prog, 'uv'),
+						model0: gl.getAttribLocation(prog, 'model0'),
+						model1: gl.getAttribLocation(prog, 'model1'),
+						model2: gl.getAttribLocation(prog, 'model2'),
+						model3: gl.getAttribLocation(prog, 'model3'),
+					},
+					uniforms: {
+						proj: gl.getUniformLocation(prog, 'proj'),
+						view: gl.getUniformLocation(prog, 'view'),
+						tex: gl.getUniformLocation(prog, 'texture'),
+					},
+				};
 
-				var uvAttr = gl.getAttribLocation(prog, 'uv');
-				gl.enableVertexAttribArray(uvAttr);
+				gl.enableVertexAttribArray(attrs.attrs.pos);
+				gl.enableVertexAttribArray(attrs.attrs.uv);
+				gl.enableVertexAttribArray(attrs.attrs.model0);
+				gl.enableVertexAttribArray(attrs.attrs.model1);
+				gl.enableVertexAttribArray(attrs.attrs.model2);
+				gl.enableVertexAttribArray(attrs.attrs.model3);
 
-				var modelAttr0 = gl.getAttribLocation(prog, 'model0');
-				gl.enableVertexAttribArray(modelAttr0);
-				var modelAttr1 = gl.getAttribLocation(prog, 'model1');
-				gl.enableVertexAttribArray(modelAttr1);
-				var modelAttr2 = gl.getAttribLocation(prog, 'model2');
-				gl.enableVertexAttribArray(modelAttr2);
-				var modelAttr3 = gl.getAttribLocation(prog, 'model3');
-				gl.enableVertexAttribArray(modelAttr3);
-
-				var proj = gl.getUniformLocation(prog, 'proj');
-				var view = gl.getUniformLocation(prog, 'view');
-				var tex = gl.getUniformLocation(prog, 'texture');
-
-				return [[posAttr, uvAttr, modelAttr0, modelAttr1, modelAttr2, modelAttr3],
-				        [proj, view, tex]];
+				return attrs;
 			}
 
 			// Returns the list of buffers
@@ -138,42 +141,44 @@
 					}
 				}
 
-				var vertbuf = gl.createBuffer();
-				gl.bindBuffer(gl.ARRAY_BUFFER, vertbuf);
+				var bufs = {
+					vert: gl.createBuffer(),
+					norm: gl.createBuffer(),
+					uv: gl.createBuffer(),
+					index: gl.createBuffer(),
+					model0: gl.createBuffer(),
+					model1: gl.createBuffer(),
+					model2: gl.createBuffer(),
+					model3: gl.createBuffer(),
+				};
+
+				gl.bindBuffer(gl.ARRAY_BUFFER, bufs.vert);
 				gl.bufferData(gl.ARRAY_BUFFER, vertex_f32, gl.STATIC_DRAW);
 
-				var normbuf = gl.createBuffer();
-				gl.bindBuffer(gl.ARRAY_BUFFER, normbuf);
+				gl.bindBuffer(gl.ARRAY_BUFFER, bufs.norm);
 				gl.bufferData(gl.ARRAY_BUFFER, norm_f32, gl.STATIC_DRAW);
 
-				var uvbuf = gl.createBuffer();
-				gl.bindBuffer(gl.ARRAY_BUFFER, uvbuf);
+				gl.bindBuffer(gl.ARRAY_BUFFER, bufs.uv);
 				gl.bufferData(gl.ARRAY_BUFFER, uv_f32, gl.STATIC_DRAW);
 
-				var indexbuf = gl.createBuffer();
-				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexbuf);
+				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bufs.index);
 				gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
 				// yes, this is extra
-				indexbuf.length = indices.length;
+				bufs.index.length = indices.length;
 
-				var modelbuf0 = gl.createBuffer();
-				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf0);
+				gl.bindBuffer(gl.ARRAY_BUFFER, bufs.model0);
 				gl.bufferData(gl.ARRAY_BUFFER, models_f32[0], gl.STATIC_DRAW);
 
-				var modelbuf1 = gl.createBuffer();
-				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf1);
+				gl.bindBuffer(gl.ARRAY_BUFFER, bufs.model1);
 				gl.bufferData(gl.ARRAY_BUFFER, models_f32[1], gl.STATIC_DRAW);
 
-				var modelbuf2 = gl.createBuffer();
-				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf2);
+				gl.bindBuffer(gl.ARRAY_BUFFER, bufs.model2);
 				gl.bufferData(gl.ARRAY_BUFFER, models_f32[2], gl.STATIC_DRAW);
 
-				var modelbuf3 = gl.createBuffer();
-				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf3);
+				gl.bindBuffer(gl.ARRAY_BUFFER, bufs.model3);
 				gl.bufferData(gl.ARRAY_BUFFER, models_f32[3], gl.STATIC_DRAW);
 
-				return [vertbuf, normbuf, uvbuf, indexbuf, modelbuf0, modelbuf1, modelbuf2,
-				        modelbuf3];
+				return bufs;
 			}
 
 			function texLoaded(gl, img, tex) {
@@ -189,20 +194,32 @@
 			}
 
 			function initTextures(gl) {
-				var bark = gl.createTexture(), foliage = gl.createTexture(), vine = gl.createTexture();
-				var barkImage = new Image(), foliageImage = new Image(), vineImage = new Image();
-				var textures = 3;
+				var texs = {
+					bark: gl.createTexture(),
+					foliage: gl.createTexture(),
+					vine: gl.createTexture(),
+				}, images = {
+					bark: new Image(),
+					foliage: new Image(),
+					vine: new Image(),
+				}, tex_values = new Array(), tex_count;
 
-				var cb = function() { if (--textures == 0) Tree.Setup(gl, [bark, foliage, vine]); };
+				for (key in texs) {
+					tex_values.push(texs[key]);
+				}
 
-				barkImage.onload = function() { texLoaded(gl, barkImage, bark); cb(); };
-				barkImage.src = 'textures/bark1.bmp';
-				foliageImage.onload = function() { texLoaded(gl, foliageImage, foliage); cb(); };
-				foliageImage.src = 'textures/foliage.png';
-				vineImage.onload = function() { texLoaded(gl, vineImage, vine); cb(); };
-				vineImage.src = 'textures/vines.png';
+				tex_count = tex_values.length;
 
-				return [bark, foliage, vine];
+				var cb = function() { if (--tex_count == 0) Tree.Setup(gl, tex_values); };
+
+				images.bark.onload = function() { texLoaded(gl, images.bark, texs.bark); cb(); };
+				images.bark.src = 'textures/bark1.bmp';
+				images.foliage.onload = function() { texLoaded(gl, images.foliage, texs.foliage); cb(); };
+				images.foliage.src = 'textures/foliage.png';
+				images.vine.onload = function() { texLoaded(gl, images.vine, texs.vine); cb(); };
+				images.vine.src = 'textures/vines.png';
+
+				return texs;
 			}
 
 			function start() {
@@ -270,43 +287,34 @@
 				}
 				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-				// wouldn't it be nice if javascript did python-style unpacking...
-				// oh look, it does, but not in IE.  well, too bad, IE.
-				var [[posattr, uvattr, modelattr0, modelattr1, modelattr2, modelattr3],
-				     [proj, view, tex]] = attributes,
-					[vertbuf, normbuf, uvbuf, indexbuf, modelbuf0, modelbuf1, modelbuf2,
-					 modelbuf3] = buffers,
-					[bark, foliage, vine] = textures,
-				    tree = Tree.texture;
-
 				// rotate around the scene once every few seconds
 				radians = ((timestamp - firsttimestamp) / 1000) * RADS_PER_SEC;
 				viewmatrix = mat4.create();
 				mat4.rotateY(viewmatrix, vm, radians);
-				gl.uniformMatrix4fv(view, false, viewmatrix);
-				gl.uniformMatrix4fv(proj, false, pm);
+				gl.uniformMatrix4fv(attributes.uniforms.view, false, viewmatrix);
+				gl.uniformMatrix4fv(attributes.uniforms.proj, false, pm);
 
 				gl.activeTexture(gl.TEXTURE0);
-				gl.bindTexture(gl.TEXTURE_2D, tree);
-				gl.uniform1i(tex, 0);
+				gl.bindTexture(gl.TEXTURE_2D, Tree.texture);
+				gl.uniform1i(attributes.uniforms.tex, 0);
 
-				gl.bindBuffer(gl.ARRAY_BUFFER, vertbuf);
-				gl.vertexAttribPointer(posattr, 3, gl.FLOAT, false, 0, 0);
+				gl.bindBuffer(gl.ARRAY_BUFFER, buffers.vert);
+				gl.vertexAttribPointer(attributes.attrs.pos, 3, gl.FLOAT, false, 0, 0);
 
-				gl.bindBuffer(gl.ARRAY_BUFFER, uvbuf);
-				gl.vertexAttribPointer(uvattr, 2, gl.FLOAT, false, 0, 0);
+				gl.bindBuffer(gl.ARRAY_BUFFER, buffers.uv);
+				gl.vertexAttribPointer(attributes.attrs.uv, 2, gl.FLOAT, false, 0, 0);
 
-				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf0);
-				gl.vertexAttribPointer(modelattr0, 4, gl.FLOAT, false, 0, 0)
-				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf1);
-				gl.vertexAttribPointer(modelattr1, 4, gl.FLOAT, false, 0, 0)
-				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf2);
-				gl.vertexAttribPointer(modelattr2, 4, gl.FLOAT, false, 0, 0)
-				gl.bindBuffer(gl.ARRAY_BUFFER, modelbuf3);
-				gl.vertexAttribPointer(modelattr3, 4, gl.FLOAT, false, 0, 0)
+				gl.bindBuffer(gl.ARRAY_BUFFER, buffers.model0);
+				gl.vertexAttribPointer(attributes.attrs.model0, 4, gl.FLOAT, false, 0, 0)
+				gl.bindBuffer(gl.ARRAY_BUFFER, buffers.model1);
+				gl.vertexAttribPointer(attributes.attrs.model1, 4, gl.FLOAT, false, 0, 0)
+				gl.bindBuffer(gl.ARRAY_BUFFER, buffers.model2);
+				gl.vertexAttribPointer(attributes.attrs.model2, 4, gl.FLOAT, false, 0, 0)
+				gl.bindBuffer(gl.ARRAY_BUFFER, buffers.model3);
+				gl.vertexAttribPointer(attributes.attrs.model3, 4, gl.FLOAT, false, 0, 0)
 
-				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexbuf);
-				gl.drawElements(gl.TRIANGLES, indexbuf.length, gl.UNSIGNED_SHORT, 0);
+				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.index);
+				gl.drawElements(gl.TRIANGLES, buffers.index.length, gl.UNSIGNED_SHORT, 0);
 
 				window.requestAnimationFrame(drawScene);
 

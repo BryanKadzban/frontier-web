@@ -761,9 +761,7 @@ Tree.Setup = function(gl, textures) {
 		var imgdata = ctx.getImageData(0, 0, TEXTURE_SIZE*4, TEXTURE_SIZE);
 		var data = new Uint8Array(TEXTURE_SIZE*4 * TEXTURE_SIZE * 4);
 		gl.readPixels(0, 0, TEXTURE_SIZE*4, TEXTURE_SIZE, gl.RGBA, gl.UNSIGNED_BYTE, data);
-		for (var i=0; i<TEXTURE_SIZE*4 * TEXTURE_SIZE * 4; i++) {
-			imgdata.data[i] = data[i];
-		}
+		imgdata.data.set(data);
 		ctx.putImageData(imgdata, 0, 0);
 	}
 

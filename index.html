@@ -4,10 +4,9 @@
 		<script src="gl-matrix-min.js"></script>
 		<script src="tree.js"></script>
 		<script>
-			var gl, fb_inter, fb_final, render_prog, render_debug_prog, render_stage2_prog;
-			var buffers = {};
-			var attributes = {};
-			var textures = {};
+			var gl, fb_inter_opaque, fb_inter_alpha, fb_final, render_prog, render_debug_prog,
+			    render_stage2_prog;
+			var buffers = {}, attributes = {}, textures = {};
 			var vm, pm;
 
 			Array.prototype.foreach = function(fn, start, limit) {
@@ -252,6 +251,7 @@
 					vine: gl.createTexture(),
 					avg_rgba: gl.createTexture(),
 					final_render: gl.createTexture(),
+					final_opaque: gl.createTexture(),
 				}, images = {
 					bark: new Image(),
 					foliage: new Image(),
@@ -262,13 +262,17 @@
 					tex_values.push(texs[key]);
 				}
 
-				tex_count = tex_values.length - 2;  // minus avg_rgba and final_render
+				tex_count = tex_values.length - 3;  // minus avg_rgba, final_render, final_opaque
 
 				gl.bindTexture(gl.TEXTURE_2D, texs.avg_rgba);
 				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 				gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1024, 1024, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 				gl.bindTexture(gl.TEXTURE_2D, texs.final_render);
+				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+				gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1024, 1024, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+				gl.bindTexture(gl.TEXTURE_2D, texs.final_opaque);
 				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 				gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1024, 1024, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
@@ -311,7 +315,8 @@
 				gl.depthFunc(gl.LEQUAL);
 				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
 
-				fb_inter = gl.createFramebuffer();
+				fb_inter_opaque = gl.createFramebuffer();
+				fb_inter_alpha = gl.createFramebuffer();
 				fb_final = gl.createFramebuffer();
 
 				attributes = initShaders(gl);
@@ -319,24 +324,41 @@
 				textures = initTextures(gl);
 
 				{
-					gl.bindFramebuffer(gl.FRAMEBUFFER, fb_inter);
+					gl.bindFramebuffer(gl.FRAMEBUFFER, fb_inter_opaque);
 					gl.bindTexture(gl.TEXTURE_2D, textures.avg_rgba);
 					gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
-						gl.TEXTURE_2D, textures.avg_rgba, 0);
+						gl.TEXTURE_2D, textures.final_opaque, 0);
 					var rb = gl.createRenderbuffer();
 					gl.bindRenderbuffer(gl.RENDERBUFFER, rb);
 					gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_STENCIL, 1024, 1024);
 					gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT,
 						 gl.RENDERBUFFER, rb);
 					gl.viewport(0, 0, 1024, 1024);
-					if (!gl.isFramebuffer(fb_inter)) {
-						throw('Invalid fb?');
+					if (!gl.isFramebuffer(fb_inter_opaque)) {
+						throw('Invalid opaque fb?');
 					}
 					var stat = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
 					if (stat != gl.FRAMEBUFFER_COMPLETE) {
-						throw('Incomplete: ' + stat.toString(16));
+						throw('Incomplete opaque: ' + stat.toString(16));
 					}
 					gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
+
+					gl.bindFramebuffer(gl.FRAMEBUFFER, fb_inter_alpha);
+					gl.bindTexture(gl.TEXTURE_2D, textures.avg_rgba);
+					gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+						gl.TEXTURE_2D, textures.avg_rgba, 0);
+					gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT,
+						 gl.RENDERBUFFER, rb);
+					gl.viewport(0, 0, 1024, 1024);
+					if (!gl.isFramebuffer(fb_inter_alpha)) {
+						throw('Invalid alpha fb?');
+					}
+					stat = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+					if (stat != gl.FRAMEBUFFER_COMPLETE) {
+						throw('Incomplete alpha: ' + stat.toString(16));
+					}
+					gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
+
 					gl.bindFramebuffer(gl.FRAMEBUFFER, fb_final);
 					gl.bindTexture(gl.TEXTURE_2D, textures.final_render);
 					gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
@@ -352,6 +374,7 @@
 						throw('Incomplete final: ' + stat.toString(16));
 					}
 					gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
+
 					gl.bindRenderbuffer(gl.RENDERBUFFER, null);
 					gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 				}
@@ -397,6 +420,11 @@
 					fpstimestamp = timestamp;
 				}
 				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
+				var vp = gl.getParameter(gl.VIEWPORT),
+				    cc = gl.getParameter(gl.COLOR_CLEAR_VALUE);
+				gl.bindFramebuffer(gl.FRAMEBUFFER, fb_inter_opaque);
+				gl.viewport(0, 0, 1024, 1024);
+				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
 				gl.enable(gl.DEPTH_TEST);
 				gl.depthMask(true);
 				// Opaque rendering doesn't change (or use) the stencil buffer
@@ -435,10 +463,7 @@
 				gl.depthMask(false);
 
 				// Use the stencil buffer to keep track of how many fragments hit each pixel
-				var vp = gl.getParameter(gl.VIEWPORT),
-				    cc = gl.getParameter(gl.COLOR_CLEAR_VALUE);
-				gl.bindFramebuffer(gl.FRAMEBUFFER, fb_inter);
-				gl.viewport(0, 0, 1024, 1024);
+				gl.bindFramebuffer(gl.FRAMEBUFFER, fb_inter_alpha);
 				gl.clearColor(0.0, 0.0, 0.0, 0.0);
 				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
 
@@ -495,7 +520,7 @@
 
 				gl.uniform1i(attributes.uniforms.render_avg_rgba, 0);
 
-				for (var i=1; i<4; i++) {
+				for (var i=1; i<9; i++) {
 					gl.stencilFunc(gl.EQUAL, i, 0xFF);
 					gl.uniform1i(attributes.uniforms.render_total_layers, i);
 					gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
@@ -503,8 +528,8 @@
 
 				// approximate n in the case of overflow
 				// reference_value OP buffer_value
-				gl.stencilFunc(gl.LEQUAL, 4, 0xFF);
-				gl.uniform1i(attributes.uniforms.render_total_layers, 4);
+				gl.stencilFunc(gl.LEQUAL, 9, 0xFF);
+				gl.uniform1i(attributes.uniforms.render_total_layers, 9);
 				gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 
 				if (false) {
@@ -528,7 +553,7 @@
 				gl.clearColor(cc[0], cc[1], cc[2], cc[3]);
 
 				gl.activeTexture(gl.TEXTURE0);
-				gl.bindTexture(gl.TEXTURE_2D, textures.final_render);
+				gl.bindTexture(gl.TEXTURE_2D, textures.final_opaque);
 
 				gl.useProgram(render_stage2_prog);
 
@@ -550,6 +575,9 @@
 				gl.stencilFunc(gl.ALWAYS, 0, 0xFF);
 				gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
+				gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+
+				gl.bindTexture(gl.TEXTURE_2D, textures.final_render);
 				gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 
 				gl.useProgram(orig_prog);

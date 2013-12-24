@@ -146,8 +146,8 @@ Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, vertex, fsiz
 			vert = vec4.fromValues(0.0,  -fsize,  fsize, 0.0);
 			vertices.push(new Vertex(vert, norm, uvTL, model));
 
-			pushQuad(base_index + 0, base_index + 1, base_index + 2, base_index + 3);
-			pushQuad(base_index + 7, base_index + 6, base_index + 5, base_index + 4);
+			pushQuad(base_index + 0, base_index + 1, base_index + 2, base_index + 3, false);
+			pushQuad(base_index + 7, base_index + 6, base_index + 5, base_index + 4, false);
 
 			break;
 		case FoliageType.SHIELD:
@@ -173,14 +173,14 @@ Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, vertex, fsiz
 			vert = vec4.fromValues(-fsize / 2, 0.0,  0.0, 0.0);
 			vertices.push(new Vertex(vert, norm, uv, model));
 
-			pushTri(base_index, base_index + 1, base_index + 2);
-			pushTri(base_index, base_index + 2, base_index + 3);
-			pushTri(base_index, base_index + 3, base_index + 4);
-			pushTri(base_index, base_index + 4, base_index + 1);
-			pushTri(base_index + 5, base_index + 2, base_index + 1);
-			pushTri(base_index + 5, base_index + 3, base_index + 2);
-			pushTri(base_index + 5, base_index + 4, base_index + 3);
-			pushTri(base_index + 5, base_index + 1, base_index + 4);
+			pushTri(base_index, base_index + 1, base_index + 2, false);
+			pushTri(base_index, base_index + 2, base_index + 3, false);
+			pushTri(base_index, base_index + 3, base_index + 4, false);
+			pushTri(base_index, base_index + 4, base_index + 1, false);
+			pushTri(base_index + 5, base_index + 2, base_index + 1, false);
+			pushTri(base_index + 5, base_index + 3, base_index + 2, false);
+			pushTri(base_index + 5, base_index + 4, base_index + 3, false);
+			pushTri(base_index + 5, base_index + 1, base_index + 4, false);
 
 			break;
 		case FoliageType.SAG:
@@ -241,15 +241,15 @@ Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, vertex, fsiz
 
 			// indices
 			// cap
-			pushTri(base_index, base_index + 2, base_index + 1);
-			pushTri(base_index, base_index + 3, base_index + 2);
-			pushTri(base_index, base_index + 4, base_index + 3);
-			pushTri(base_index, base_index + 1, base_index + 4);
+			pushTri(base_index, base_index + 2, base_index + 1, false);
+			pushTri(base_index, base_index + 3, base_index + 2, false);
+			pushTri(base_index, base_index + 4, base_index + 3, false);
+			pushTri(base_index, base_index + 1, base_index + 4, false);
 			// outer triangles
-			pushTri(base_index + 5, base_index + 1, base_index + 2);
-			pushTri(base_index + 6, base_index + 2, base_index + 3);
-			pushTri(base_index + 7, base_index + 3, base_index + 4);
-			pushTri(base_index + 8, base_index + 4, base_index + 1);
+			pushTri(base_index + 5, base_index + 1, base_index + 2, false);
+			pushTri(base_index + 6, base_index + 2, base_index + 3, false);
+			pushTri(base_index + 7, base_index + 3, base_index + 4, false);
+			pushTri(base_index + 8, base_index + 4, base_index + 1, false);
 
 			break;
 		case FoliageType.BOWL:
@@ -280,15 +280,15 @@ Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, vertex, fsiz
 			norm = vec3.fromValues(0.0, 0.0, 1.0);
 			vertices.push(new Vertex(vert, norm, uv, model));
 
-			pushTri(base_index, base_index + 1, base_index + 2);
-			pushTri(base_index, base_index + 2, base_index + 3);
-			pushTri(base_index, base_index + 3, base_index + 4);
-			pushTri(base_index, base_index + 4, base_index + 1);
+			pushTri(base_index, base_index + 1, base_index + 2, false);
+			pushTri(base_index, base_index + 2, base_index + 3, false);
+			pushTri(base_index, base_index + 3, base_index + 4, false);
+			pushTri(base_index, base_index + 4, base_index + 1, false);
 
-			pushTri(base_index + 5, base_index + 2, base_index + 1);
-			pushTri(base_index + 5, base_index + 3, base_index + 2);
-			pushTri(base_index + 5, base_index + 4, base_index + 3);
-			pushTri(base_index + 5, base_index + 1, base_index + 4);
+			pushTri(base_index + 5, base_index + 2, base_index + 1, false);
+			pushTri(base_index + 5, base_index + 3, base_index + 2, false);
+			pushTri(base_index + 5, base_index + 4, base_index + 3, false);
+			pushTri(base_index + 5, base_index + 1, base_index + 4, false);
 
 			//pushQuad(base_index + 1, base_index + 4, base_index + 3, base_index + 2);
 
@@ -320,10 +320,10 @@ Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, vertex, fsiz
 			// uv still has the previous lerp'ed value
 			vertices.push(new Vertex(vert, norm, uv, model));
 
-			pushTri(base_index, base_index + 2, base_index + 1);
-			pushTri(base_index, base_index + 3, base_index + 2);
-			pushTri(base_index, base_index + 4, base_index + 3);
-			pushTri(base_index, base_index + 1, base_index + 4);
+			pushTri(base_index, base_index + 2, base_index + 1, false);
+			pushTri(base_index, base_index + 3, base_index + 2, false);
+			pushTri(base_index, base_index + 4, base_index + 3, false);
+			pushTri(base_index, base_index + 1, base_index + 4, false);
 
 			break;
 	}
@@ -349,7 +349,8 @@ Tree.prototype.makeVines_ = function(vertices, pushQuad, bottom_points, model) {
 			base_index + segment*2,
 			base_index + segment*2 + 1,
 			base_index + (segment + 1)*2,
-			base_index + (segment + 1)*2 + 1
+			base_index + (segment + 1)*2 + 1,
+			false
 		);
 	}
 };
@@ -428,14 +429,16 @@ Tree.prototype.makeBranch_ = function(vertices, pushTri, pushQuad, anchor, angle
 					base_index + (ring + 0) + (segment + 0) * (radial_edge),
 					base_index + (ring + 0) + (segment + 1) * (radial_edge),
 					base_index + (ring + 1) + (segment + 1) * (radial_edge),
-					base_index + (ring + 1) + (segment + 0) * (radial_edge)
+					base_index + (ring + 1) + (segment + 0) * (radial_edge),
+					true
 				);
 			} else {
 				// end-of-branch segment; use triangles
 				pushTri(
 					base_index + (ring + 1) + segment * (radial_edge),
 					base_index + (ring + 0) + segment * (radial_edge),
-					vertices.length - 1
+					vertices.length - 1,
+					true
 				);
 			}
 		}
@@ -780,10 +783,11 @@ Tree.Setup = function(gl, textures) {
 	Tree.texture = new_tex;
 };
 
-// Add vertices for this tree to the vertices list (each item is a list of vert,
-// norm, uv vectors, plus a model matrix), and indices list (each item is a
-// uint16 index into the vertices list) for rendering as gl.TRIANGLES
-Tree.prototype.Build = function(vertices, indices) {
+// Add vertices for this tree to the vertices list (each item is a Vertex; see
+// above for its definition), and both indices lists (each item in each is a
+// uint16 index into the vertices list; the two lists are needed to render the
+// fully opaque fragments first) for rendering as gl.TRIANGLES
+Tree.prototype.Build = function(vertices, opaque_indices, alpha_indices) {
 	var _default_height = 8 + 4, // + randf*4 + randf*4
 	    _default_branches = 2, // 2 + rand % 2
 	    _default_lowest_branch = 3.0 / _default_height,
@@ -855,13 +859,19 @@ Tree.prototype.Build = function(vertices, indices) {
 	var last_vert = new Vertex(vert, norm, uv, model);
 	vertices.push(last_vert);
 
-	var pushTri = function(index1, index2, index3) {
-		indices.push(index1);
-		indices.push(index2);
-		indices.push(index3);
-	}, pushQuad = function(index1, index2, index3, index4) {
-		pushTri(index1, index2, index3);
-		pushTri(index1, index3, index4);
+	var pushTri = function(index1, index2, index3, opaque) {
+		if (opaque) {
+			opaque_indices.push(index1);
+			opaque_indices.push(index2);
+			opaque_indices.push(index3);
+		} else {
+			alpha_indices.push(index1);
+			alpha_indices.push(index2);
+			alpha_indices.push(index3);
+		}
+	}, pushQuad = function(index1, index2, index3, index4, opaque) {
+		pushTri(index1, index2, index3, opaque);
+		pushTri(index1, index3, index4, opaque);
 	};
 
 	for (var segment=0; segment<branches.length; segment++) {
@@ -870,7 +880,8 @@ Tree.prototype.Build = function(vertices, indices) {
 				base_index + (ring+0) + (segment+0)*(STEPS+1),
 				base_index + (ring+1) + (segment+0)*(STEPS+1),
 				base_index + (ring+1) + (segment+1)*(STEPS+1),
-				base_index + (ring+0) + (segment+1)*(STEPS+1)
+				base_index + (ring+0) + (segment+1)*(STEPS+1),
+				true
 			);
 		}
 	}
@@ -879,7 +890,8 @@ Tree.prototype.Build = function(vertices, indices) {
 		pushTri(
 			base_index + (ring+1) + (branches.length)*(STEPS+1),
 			vertices.length - 1,
-			base_index + (ring+0) + (branches.length)*(STEPS+1)
+			base_index + (ring+0) + (branches.length)*(STEPS+1),
+			true
 		);
 	}
 

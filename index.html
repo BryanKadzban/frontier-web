@@ -307,7 +307,7 @@
 				gl.clearStencil(0);
 				gl.enable(gl.BLEND);
 				gl.blendEquation(gl.FUNC_ADD);
-				gl.blendFunc(gl.ONE, gl.ONE);
+				gl.blendFuncSeparate(gl.ONE, gl.ONE, gl.ONE, gl.ONE);
 
 				gl.enable(gl.STENCIL_TEST);
 
@@ -430,6 +430,7 @@
 				// Opaque rendering doesn't change (or use) the stencil buffer
 				gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
 				gl.stencilFunc(gl.ALWAYS, 0, 0xff);
+				gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE);
 
 				// rotate around the scene once every few seconds
 				radians = ((timestamp - firsttimestamp) / 1000) * RADS_PER_SEC;
@@ -461,6 +462,7 @@
 				gl.drawElements(gl.TRIANGLES, buffers.opaque_indices.length, gl.UNSIGNED_SHORT, 0);
 
 				gl.depthMask(false);
+				gl.blendFuncSeparate(gl.ONE, gl.ONE, gl.ONE, gl.ONE);
 
 				// Use the stencil buffer to keep track of how many fragments hit each pixel
 				gl.bindFramebuffer(gl.FRAMEBUFFER, fb_inter_alpha);
@@ -573,7 +575,7 @@
 				gl.vertexAttribPointer(attributes.attrs.render_stage2_uv, 2, gl.FLOAT, false, 0, 0);
 
 				gl.stencilFunc(gl.ALWAYS, 0, 0xFF);
-				gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+				gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE);
 
 				gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 

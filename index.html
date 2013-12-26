@@ -157,9 +157,9 @@
 				var pos = vec3.fromValues(-20.0, -20.0, 0.0);
 				var pos2 = vec3.fromValues(20.0, 20.0, 0.0);
 				var pos3 = vec3.fromValues(0.0, 0.0, 0.0);
-				var tree = new Tree(TreeType.EVERGREEN, FoliageType.UMBRELLA, false, BranchType.NORMAL, pos);
-				var tree2 = new Tree(TreeType.NORMAL, FoliageType.UMBRELLA, false, BranchType.NORMAL, pos2);
-				var tree3 = new Tree(TreeType.CANOPY, FoliageType.UMBRELLA, false, BranchType.NORMAL, pos3);
+				var tree = new Tree(TreeType.EVERGREEN, FoliageType.UMBRELLA, false, BranchType.NORMAL, LeafStyle.SCATTER, pos);
+				var tree2 = new Tree(TreeType.NORMAL, FoliageType.UMBRELLA, false, BranchType.NORMAL, LeafStyle.FAN, pos2);
+				var tree3 = new Tree(TreeType.CANOPY, FoliageType.UMBRELLA, false, BranchType.NORMAL, LeafStyle.SCATTER, pos3);
 				tree.Build(vertices, opaque_indices, alpha_indices);
 				tree2.Build(vertices, opaque_indices, alpha_indices);
 				tree3.Build(vertices, opaque_indices, alpha_indices);

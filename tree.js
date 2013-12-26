@@ -42,14 +42,14 @@ function Leaf(size, position, angle, color, dist, neighbor) {
 	this.neighbor = neighbor;
 }
 
-function Tree(tree_type, foliage_type, funnel, trunk_type, position) {
+function Tree(tree_type, foliage_type, funnel, trunk_type, leaf_style, position) {
 	this.tree_type_ = tree_type;
 	this.foliage_type_ = foliage_type;
 	this.funnel_ = funnel;
 	this.trunk_type_ = trunk_type;
 	this.bend_freq_ = 1.0 + (Math.random()*2) + Math.random();
 	this.model_ = mat4.create();
-	this.leaf_style_ = (Math.random() > 0.5) ? LeafStyle.FAN : LeafStyle.SCATTER;
+	this.leaf_style_ = leaf_style;
 	// Tree-building and object-placing code assumes positive Z is "up", but it's
 	// actually "into the screen".  Fix by rotating the model matrix.
 	mat4.rotateX(this.model_, this.model_, -Math.PI / 2);

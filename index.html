@@ -740,5 +740,29 @@
 				gl_FragColor = vColor * texel;
 			}
 		</script>
+		<script type="x-shader/x-vertex" id="texture-line-vshader">
+			#version 100
+
+			uniform mat4 proj;
+
+			attribute vec2 pos;
+			attribute vec4 color;
+			varying lowp vec4 vColor;
+
+			void main(void) {
+				vec4 localpos = vec4(pos, -10.0, 1.0);
+				gl_Position = proj * localpos;
+				vColor = color;
+			}
+		</script>
+		<script type="x-shader/x-fragment" id="texture-line-fshader">
+			#version 100
+
+			varying lowp vec4 vColor;
+
+			void main(void) {
+				gl_FragColor = vColor;
+			}
+		</script>
 	</body>
 </html>

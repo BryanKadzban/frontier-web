@@ -24,6 +24,11 @@ var FoliageType = Object.freeze({
 	UMBRELLA: 4
 });
 
+var LeafStyle = Object.freeze({
+	FAN: 0,
+	SCATTER: 1
+});
+
 // Convention: underscore-suffixed names are private
 
 // gl-matrix.js or gl-matrix-min.js must be evaluated before this file
@@ -44,6 +49,7 @@ function Tree(tree_type, foliage_type, funnel, trunk_type, position) {
 	this.trunk_type_ = trunk_type;
 	this.bend_freq_ = 1.0 + (Math.random()*2) + Math.random();
 	this.model_ = mat4.create();
+	this.leaf_style_ = (Math.random() > 0.5) ? LeafStyle.FAN : LeafStyle.SCATTER;
 	// Tree-building and object-placing code assumes positive Z is "up", but it's
 	// actually "into the screen".  Fix by rotating the model matrix.
 	mat4.rotateX(this.model_, this.model_, -Math.PI / 2);
@@ -501,7 +507,8 @@ Tree.drawBarkTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj
 	gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 };
 
-Tree.drawLeafTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj, leaf_color) {
+Tree.drawLeafTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, line_posAttr, line_colorAttr, texObj,
+                                 leaf_color, bark_color) {
 	var leaves = [];
 
 	if (1 /* TREE_LEAF_FAN */) {
@@ -518,7 +525,47 @@ Tree.drawLeafTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj
 			}
 		}
 	} else {
-		// TODO: implement
+		// Put one big leaf in the center
+		var leaf_size = TEXTURE_SIZE / 6,
+		    pos = vec2.fromValues(TEXTURE_SIZE / 2, TEXTURE_SIZE / 2),
+		    delta, dist, smaller_size;
+		leaves.push(new Leaf(leaf_size, pos, 0, vec4.create(), 0, 0));
+		// Now scatter other leaves around
+		for (var i = 0; i < 50; i++) {
+			delta = vec2.fromValues(
+				(Math.random() - 0.5) * (TEXTURE_SIZE - leaf_size),
+				(Math.random() - 0.5) * (TEXTURE_SIZE - leaf_size)
+			);
+			dist = vec2.length(delta);
+			vec2.add(pos, delta, vec2.create(TEXTURE_SIZE / 2, TEXTURE_SIZE / 2));
+			// leaves get smaller as we move from the center of the texture
+			smaller_size = (1.0 - (dist * 1.5 / TEXTURE_SIZE)) * leaf_size;
+			leaves.push(new Leaf(smaller_size, pos, 0, vec4.create(), dist, 0));
+		}
+		leaves.sort(function(a, b) {
+			if (a.dist < b.dist) return -1;
+			if (a.dist > b.dist) return 1;
+			return 0;
+		});
+		leaves.foreach(function(leaf, i) {
+			var delta = vec2.create(),
+			    nearest, distance, a, b;
+			vec2.sub(delta, leaf.position, leaves[0].position);
+			nearest = vec2.length(delta);
+			for (var j = 1; j < i; j++) {
+				vec2.sub(delta, leaf.position, leaves[j].position);
+				distance = vec2.length(delta);
+				if (distance < nearest) {
+					leaf.neighbor = j;
+					nearest = distance;
+				}
+			}
+			// get the angle between this leaf and the neighbor
+			a = leaves[leaf.neighbor].position;
+			b = leaf.position;
+			leaf.angle = Math.arccos(vec2.dot(a, b) / (vec2.length(a) * vec2.length(b)));
+			// (0.0) is one of the left corners, so all the angles are in the range of arccos
+		});
 	}
 
 	leaves.foreach(function(leaf) {
@@ -526,7 +573,31 @@ Tree.drawLeafTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj
 	});
 
 	if (0  /* TREE_LEAF_SCATTER */) {
-		// TODO: implement
+		var c = vec4.create(),
+		    line_pos_f32 = new Float32Array(2 * 2 * leaves.length),
+		    line_color_f32 = new Float32Array(4 * 2 * leaves.length),
+		    line_pos_buf = gl.createBuffer(),
+		    line_color_buf = gl.createBuffer();
+		vec4.scale(c, bark_color, 0.5);
+		gl.lineWidth(3.0);
+
+		leaves.foreach(function(leaf, i) {
+			line_pos_f32.subarray(i * 2 * 2).set(leaves[leaf.neighbor].position);
+			line_pos_f32.subarray(i * 2 * 2 + 2).set(leaf.position);
+
+			line_color_f32.subarray(i * 2 * 4).set(bark_color);
+			line_color_f32.subarray(i * 2 * 4 + 4).set(bark_color);
+		});
+
+		gl.bindBuffer(gl.ARRAY_BUFFER, line_pos_buf);
+		gl.bufferData(gl.ARRAY_BUFFER, line_pos_f32, gl.STATIC_DRAW);
+		gl.vertexAttribPointer(line_posAttr, 2, gl.FLOAT, false, 0, 0);
+
+		gl.bindBuffer(gl.ARRAY_BUFFER, line_color_buf);
+		gl.bufferData(gl.ARRAY_BUFFER, line_color_f32, gl.STATIC_DRAW);
+		gl.vertexAttribPointer(line_colorAttr, 4, gl.FLOAT, false, 0, 0);
+
+		gl.drawArrays(gl.LINES, 0, 2 * leaves.length);
 	}
 
 	var color_f32 = new Float32Array(4 * 6 * leaves.length),
@@ -662,6 +733,8 @@ Tree.drawVineTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj
 Tree.Setup = function(gl, textures) {
 	var fb = gl.createFramebuffer(), fb_vshader = getShader(gl, 'texture-vshader'),
 	    fb_fshader = getShader(gl, 'texture-fshader'), prog = gl.createProgram(),
+	    fb_line_vshader = getShader(gl, 'texture-line-vshader'),
+	    fb_line_fshader = getShader(gl, 'texture-line-fshader'), line_prog = gl.createProgram(),
 	    moisture = 0.5, temperature = 0.5,
 	    leaf_color = vec4.create(), bark_color = vec4.create(),
 	    wet_grass = vec4.fromValues(0.15, 0.4+0.3, 0.15, 1.0),
@@ -709,19 +782,34 @@ Tree.Setup = function(gl, textures) {
 		return;
 	}
 
+	gl.attachShader(line_prog, fb_line_vshader);
+	gl.attachShader(line_prog, fb_line_fshader);
+	gl.linkProgram(line_prog);
+
+	if (!gl.getProgramParameter(line_prog, gl.LINK_STATUS)) {
+		alert('Link of fb line shader failed: ' + gl.getProgramInfoLog(line_prog));
+		return;
+	}
+
 	var old_shader = gl.getParameter(gl.CURRENT_PROGRAM);
 	gl.useProgram(prog);
 
 	var posAttr = gl.getAttribLocation(prog, 'pos'),
 	    colorAttr = gl.getAttribLocation(prog, 'color'),
 	    uvAttr = gl.getAttribLocation(prog, 'uv'),
+	    line_posAttr = gl.getAttribLocation(line_prog, 'pos'),
+	    line_colorAttr = gl.getAttribLocation(line_prog, 'color'),
 	    projAttr = gl.getUniformLocation(prog, 'proj'),
 	    texAttr = gl.getUniformLocation(prog, 'tex'),
+	    line_projAttr = gl.getUniformLocation(line_prog, 'proj'),
 	    proj = mat4.create();
-	[posAttr, colorAttr, uvAttr].foreach(function(attr) {gl.enableVertexAttribArray(attr);});
+	[posAttr, colorAttr, uvAttr, line_posAttr, line_colorAttr].foreach(function(attr) {
+		gl.enableVertexAttribArray(attr);
+	});
 
 	mat4.ortho(proj, 0, TEXTURE_SIZE, 0, TEXTURE_SIZE, 0.1, 2048);
 	gl.uniformMatrix4fv(projAttr, false, proj);
+	gl.uniformMatrix4fv(line_projAttr, false, proj);
 
 	var old_tex = gl.getParameter(gl.TEXTURE_BINDING_2D),
 	    old_active_tex = gl.getParameter(gl.ACTIVE_TEXTURE),
@@ -749,7 +837,8 @@ Tree.Setup = function(gl, textures) {
 	gl.bindTexture(gl.TEXTURE_2D, textures[1]);
 	gl.uniform1i(texAttr, 1);
 	gl.viewport(TEXTURE_SIZE, 0, TEXTURE_SIZE, TEXTURE_SIZE);
-	Tree.drawLeafTexture_(gl, posAttr, colorAttr, uvAttr, texAttr, textures[1], leaf_color);
+	Tree.drawLeafTexture_(gl, posAttr, colorAttr, uvAttr, texAttr, line_posAttr, line_colorAttr,
+		textures[1], leaf_color, bark_color);
 	gl.bindTexture(gl.TEXTURE_2D, textures[2]);
 	gl.uniform1i(texAttr, 1);
 	gl.viewport(TEXTURE_SIZE*2, 0, TEXTURE_SIZE, TEXTURE_SIZE);

@@ -199,10 +199,6 @@ Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, vertex, fsiz
 			var level1 = fsize * -0.4,
 			    level2 = fsize * -1.2,
 			    uv_mid = vec2.create();
-			var uv_innerTL = vec2.fromValues(0.25 + 1.25, 0.125),
-			    uv_innerTR = vec2.fromValues(0.5 - 0.125, 0.125),
-			    uv_innerBR = vec2.fromValues(0.5 - 0.125, 1.0 - 0.125),
-			    uv_innerBL = vec2.fromValues(0.25 + 1.25, 1.0 - 0.125);
 
 			norm = vec3.fromValues(0.0, 0.0, 1.0);
 

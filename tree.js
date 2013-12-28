@@ -401,17 +401,18 @@ Tree.prototype.makeBranch_ = function(vertices, pushTri, pushQuad, anchor, angle
 			vertices.push(new Vertex(vert, norm, vec2.fromValues(0.249, vert[1]), model));
 		} else {
 			for (var ring=0; ring<=radial_steps; ring++) {
+				// ring == 0 means the bottom of the circle, so subtract pi/2 from all
+				// the angle values (since normally an angle of 0 is the right side of
+				// a circle).  Go around counterclockwise.
 				if (ring == radial_steps || ring == 0) {
-					ring_angle = 0;
+					ring_angle = -Math.PI / 2;
 				} else {
-					ring_angle = ring * 2 * Math.PI / radial_steps;
+					ring_angle = ring * 2 * Math.PI / radial_steps - Math.PI / 2;
 				}
-				// Yeah, sin / cos is weird here (cos is the x coordinate of the circle,
-				// after all), but angle 0 needs to be the bottom, not the right side.
 				vert = vec4.fromValues(
-					Math.sin(ring_angle) * radius,
-					anchor.length * horiz_pos,
 					Math.cos(ring_angle) * radius,
+					anchor.length * horiz_pos,
+					Math.sin(ring_angle) * radius,
 					1.0
 				);
 				vec4.transformMat4(vert, vert, mat);

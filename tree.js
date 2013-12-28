@@ -334,7 +334,7 @@ Tree.prototype.makeFoliage_ = function(vertices, pushTri, pushQuad, vertex, fsiz
 // Same for vines
 Tree.prototype.makeVines_ = function(vertices, pushQuad, bottom_points, model) {
 	var base_index = vertices.length,
-	    vert, norm = vec3.fromValues(0.0, 0.0, 1.0), uv,
+	    vert, norm = vec3.fromValues(0.0, 0.0, 1.0),
 	    vert_2 = vec4.create();
 
 	// if (!has_vines_) return;
@@ -706,16 +706,16 @@ Tree.drawVineTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, texObj
 	gl.bufferData(gl.ARRAY_BUFFER, color_f32, gl.STATIC_DRAW);
 	gl.vertexAttribPointer(colorAttr, 4, gl.FLOAT, false, 0, 0);
 
-	uv_f32.subarray(0).set(uvBL);
+	uv_f32.subarray(0).set(uvTR);
 	vert_f32.subarray(0).set(vec3.fromValues(0.0, 0.0, 0.0));
 
-	uv_f32.subarray(1 * 2).set(uvTL);
+	uv_f32.subarray(1 * 2).set(uvBR);
 	vert_f32.subarray(1 * 3).set(vec3.fromValues(TEXTURE_SIZE, 0.0, 0.0));
 
-	uv_f32.subarray(2 * 2).set(uvTR);
+	uv_f32.subarray(2 * 2).set(uvBL);
 	vert_f32.subarray(2 * 3).set(vec3.fromValues(TEXTURE_SIZE, TEXTURE_SIZE, 0.0));
 
-	uv_f32.subarray(3 * 2).set(uvBR);
+	uv_f32.subarray(3 * 2).set(uvTL);
 	vert_f32.subarray(3 * 3).set(vec3.fromValues(0.0, TEXTURE_SIZE, 0.0));
 
 	gl.bindBuffer(gl.ARRAY_BUFFER, uv_buf);

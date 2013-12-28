@@ -394,10 +394,10 @@ Tree.prototype.makeBranch_ = function(vertices, pushTri, pushQuad, anchor, angle
 		// if this is the last segment, don't make a ring of points, make one,
 		// in the center, so the branch can end at a point
 		if (segment == segment_count) {
-			vert = vec4.fromValues(0.0, anchor.length*horiz_pos, 0.0, 0.0);
+			vert = vec4.fromValues(0.0, anchor.length*horiz_pos, 0.0, 1.0);
 			vec4.transformMat4(vert, vert, mat);
 			vec4.add(vert, vert, core);
-			norm = vec4.fromValues(vert[0], 0.0, vert[2]);
+			norm = vec3.fromValues(vert[0], 0.0, vert[2]);
 			vertices.push(new Vertex(vert, norm, vec2.fromValues(0.249, vert[1]), model));
 		} else {
 			for (var ring=0; ring<=radial_steps; ring++) {
@@ -406,11 +406,13 @@ Tree.prototype.makeBranch_ = function(vertices, pushTri, pushQuad, anchor, angle
 				} else {
 					ring_angle = ring * 2 * Math.PI / radial_steps;
 				}
+				// Yeah, sin / cos is weird here (cos is the x coordinate of the circle,
+				// after all), but angle 0 needs to be the bottom, not the right side.
 				vert = vec4.fromValues(
-					-Math.cos(ring_angle) * radius,
+					Math.sin(ring_angle) * radius,
 					anchor.length * horiz_pos,
-					-Math.sin(ring_angle) * radius,
-					0.0
+					Math.cos(ring_angle) * radius,
+					1.0
 				);
 				vec4.transformMat4(vert, vert, mat);
 				vec4.add(vert, vert, core);

@@ -7,7 +7,8 @@
 			var gl, fb_inter_opaque, fb_inter_alpha, fb_final, render_prog, render_debug_prog,
 			    render_stage2_prog;
 			var buffers = {}, attributes = {}, textures = {};
-			var vm, pm, camera_pitch = 0, camera_yaw = 0;
+			var vm, pm, camera_pitch = 0, camera_yaw = 0, camera_pos = vec3.fromValues(0.0, 8.0, 70.0);
+			var keystate = {};
 
 			Array.prototype.foreach = function(fn, start, limit) {
 				if (start === undefined) start = 0;
@@ -404,6 +405,12 @@
 						'browser that supports requestPointerLock.  Good luck!');
 				}
 
+				// looks like the canvas can't get focus or something, probably related to pointerlock
+				//canvas.addEventListener('keydown', keyDown, false);
+				//canvas.addEventListener('keyup', keyUp, false);
+				document.addEventListener('keydown', keyDown, false);
+				document.addEventListener('keyup', keyUp, false);
+
 				// Do I really need this extra scope?  Eh, why not.
 				(function() {
 					var requestAnimationFrame = (window.requestAnimationFrame ||
@@ -413,6 +420,22 @@
 					window.requestAnimationFrame = requestAnimationFrame;
 				})();
 				window.requestAnimationFrame(drawScene);
+			}
+
+			function keyDown(e) {
+				var key = e.key || e.keyCode;
+				// sigh...
+				if (key === 'MozPrintableKey')
+					key = e.keyCode;
+				keystate[key] = true;
+			}
+
+			function keyUp(e) {
+				var key = e.key || e.keyCode;
+				// sigh...
+				if (key === 'MozPrintableKey')
+					key = e.keyCode;
+				keystate[key] = false;
 			}
 
 			function pointerLockError() {
@@ -463,13 +486,45 @@
 
 				mat4.rotateX(rotation, rotation, camera_pitch);
 				mat4.rotateY(rotation, rotation, camera_yaw);
-				// TODO: put the actual camera position (negated) in here
-				mat4.translate(rotation, rotation, vec3.fromValues(0.0, -8.0, -70.0));
-				mat4.copy(vm, rotation);
+				mat4.translate(vm, rotation, vec3.negate(vec3.create(), camera_pos));
 			}
 
 			var fpstimestamp = null;
 			var frames = 0;
+
+			function moveCamera() {
+				if (!keystate["W"] && !keystate[87] &&
+				    !keystate["S"] && !keystate[83] &&
+				    !keystate["A"] && !keystate[65] &&
+				    !keystate["D"] && !keystate[68]) {
+					return;
+				}
+
+				var movement = vec3.fromValues(0.0, 0.0, 1.0),
+				    rotation = mat4.create(),
+				    right_movement = vec3.create();
+				// ...However, the giant comment above does mean that this angle is stored
+				// negative, so to get a correct movement vector, we need to rotate the
+				// identity matrix by the negation of the value stored in the yaw vairable.
+				mat4.rotateY(rotation, rotation, -camera_yaw);
+				vec3.transformMat4(movement, movement, rotation);
+				vec3.cross(right_movement, movement, vec3.fromValues(0.0, 1.0, 0.0));
+
+				if (keystate["W"] || keystate[87]) {
+					vec3.sub(camera_pos, camera_pos, movement);
+				}
+				if (keystate["S"] || keystate[83]) {
+					vec3.add(camera_pos, camera_pos, movement);
+				}
+				if (keystate["A"] || keystate[65]) {
+					vec3.add(camera_pos, camera_pos, right_movement);
+				}
+				if (keystate["D"] || keystate[68]) {
+					vec3.sub(camera_pos, camera_pos, right_movement);
+				}
+				// now actually update the view matrix
+				mouseMoved({});
+			}
 
 			function drawScene(timestamp) {
 				if (fpstimestamp !== null) {
@@ -481,6 +536,9 @@
 				} else {
 					fpstimestamp = timestamp;
 				}
+
+				moveCamera();
+
 				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
 				var vp = gl.getParameter(gl.VIEWPORT),
 				    cc = gl.getParameter(gl.COLOR_CLEAR_VALUE);

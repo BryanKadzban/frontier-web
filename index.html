@@ -4,8 +4,8 @@
 		<script src="gl-matrix-min.js"></script>
 		<script src="tree.js"></script>
 		<script>
-			var gl, fb_inter_opaque, fb_inter_alpha, fb_final, render_prog, render_debug_prog,
-			    render_stage2_prog;
+			var gl, fb_inter_opaque, fb_inter_alpha, fb_final,
+			    opaque_prog, alpha_prog, render_prog, render_debug_prog, render_stage2_prog;
 			var buffers = {}, attributes = {}, textures = {};
 			var vm, pm, camera_pitch = 0, camera_yaw = 0, camera_pos = vec3.fromValues(0.0, 8.0, 70.0);
 			var keystate = {};
@@ -65,23 +65,34 @@
 			// second list is the uniform locations
 			function initShaders(gl) {
 				var vert = getShader(gl, "vert-shader"),
-				    frag = getShader(gl, "frag-shader"),
+				    frag_opaque = getShader(gl, "frag-shader-opaque"),
+				    frag_alpha = getShader(gl, "frag-shader-alpha"),
 				    render_vert = getShader(gl, "render-vshader"),
 				    render_frag = getShader(gl, "render-fshader"),
 				    render_debug_vert = getShader(gl, "render-debug-vshader"),
 				    render_debug_frag = getShader(gl, "render-debug-fshader"),
-				    render_stage2_frag = getShader(gl, "render-stage2-fshader"),
-				    prog = gl.createProgram();
+				    render_stage2_frag = getShader(gl, "render-stage2-fshader");
 
-				gl.attachShader(prog, vert);
-				gl.attachShader(prog, frag);
-				gl.linkProgram(prog);
+				opaque_prog = gl.createProgram();
+				alpha_prog = gl.createProgram();
 
-				if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-					alert('Link failed: ' + gl.getProgramInfoLog(prog));
+				gl.attachShader(opaque_prog, vert);
+				gl.attachShader(opaque_prog, frag_opaque);
+				gl.linkProgram(opaque_prog);
+
+				if (!gl.getProgramParameter(opaque_prog, gl.LINK_STATUS)) {
+					alert('Link failed: ' + gl.getProgramInfoLog(opaque_prog));
 				}
 
-				gl.useProgram(prog);
+				gl.useProgram(opaque_prog);
+
+				gl.attachShader(alpha_prog, vert);
+				gl.attachShader(alpha_prog, frag_alpha);
+				gl.linkProgram(alpha_prog);
+
+				if (!gl.getProgramParameter(alpha_prog, gl.LINK_STATUS)) {
+					alert('Link failed: ' + gl.getProgramInfoLog(alpha_prog));
+				}
 
 				render_prog = gl.createProgram();
 				gl.attachShader(render_prog, render_vert);
@@ -112,12 +123,22 @@
 
 				var attrs = {
 					attrs: {
-						pos: gl.getAttribLocation(prog, 'pos'),
-						uv: gl.getAttribLocation(prog, 'uv'),
-						model0: gl.getAttribLocation(prog, 'model0'),
-						model1: gl.getAttribLocation(prog, 'model1'),
-						model2: gl.getAttribLocation(prog, 'model2'),
-						model3: gl.getAttribLocation(prog, 'model3'),
+						opaque: {
+							pos: gl.getAttribLocation(opaque_prog, 'pos'),
+							uv: gl.getAttribLocation(opaque_prog, 'uv'),
+							model0: gl.getAttribLocation(opaque_prog, 'model0'),
+							model1: gl.getAttribLocation(opaque_prog, 'model1'),
+							model2: gl.getAttribLocation(opaque_prog, 'model2'),
+							model3: gl.getAttribLocation(opaque_prog, 'model3'),
+						},
+						alpha: {
+							pos: gl.getAttribLocation(alpha_prog, 'pos'),
+							uv: gl.getAttribLocation(alpha_prog, 'uv'),
+							model0: gl.getAttribLocation(alpha_prog, 'model0'),
+							model1: gl.getAttribLocation(alpha_prog, 'model1'),
+							model2: gl.getAttribLocation(alpha_prog, 'model2'),
+							model3: gl.getAttribLocation(alpha_prog, 'model3'),
+						},
 						render_pos: gl.getAttribLocation(render_prog, 'pos'),
 						render_uv: gl.getAttribLocation(render_prog, 'uv'),
 						render_debug_pos: gl.getAttribLocation(render_debug_prog, 'pos'),
@@ -125,9 +146,16 @@
 						render_stage2_uv: gl.getAttribLocation(render_stage2_prog, 'uv'),
 					},
 					uniforms: {
-						proj: gl.getUniformLocation(prog, 'proj'),
-						view: gl.getUniformLocation(prog, 'view'),
-						tex: gl.getUniformLocation(prog, 'texture'),
+						opaque: {
+							proj: gl.getUniformLocation(opaque_prog, 'proj'),
+							view: gl.getUniformLocation(opaque_prog, 'view'),
+							tex: gl.getUniformLocation(opaque_prog, 'texture'),
+						},
+						alpha: {
+							proj: gl.getUniformLocation(alpha_prog, 'proj'),
+							view: gl.getUniformLocation(alpha_prog, 'view'),
+							tex: gl.getUniformLocation(alpha_prog, 'texture'),
+						},
 						render_proj: gl.getUniformLocation(render_prog, 'proj'),
 						render_avg_rgba: gl.getUniformLocation(render_prog, 'avg_rgba'),
 						render_total_layers: gl.getUniformLocation(render_prog, 'total_layers'),
@@ -137,12 +165,18 @@
 					},
 				};
 
-				gl.enableVertexAttribArray(attrs.attrs.pos);
-				gl.enableVertexAttribArray(attrs.attrs.uv);
-				gl.enableVertexAttribArray(attrs.attrs.model0);
-				gl.enableVertexAttribArray(attrs.attrs.model1);
-				gl.enableVertexAttribArray(attrs.attrs.model2);
-				gl.enableVertexAttribArray(attrs.attrs.model3);
+				gl.enableVertexAttribArray(attrs.attrs.opaque.pos);
+				gl.enableVertexAttribArray(attrs.attrs.opaque.uv);
+				gl.enableVertexAttribArray(attrs.attrs.opaque.model0);
+				gl.enableVertexAttribArray(attrs.attrs.opaque.model1);
+				gl.enableVertexAttribArray(attrs.attrs.opaque.model2);
+				gl.enableVertexAttribArray(attrs.attrs.opaque.model3);
+				gl.enableVertexAttribArray(attrs.attrs.alpha.pos);
+				gl.enableVertexAttribArray(attrs.attrs.alpha.uv);
+				gl.enableVertexAttribArray(attrs.attrs.alpha.model0);
+				gl.enableVertexAttribArray(attrs.attrs.alpha.model1);
+				gl.enableVertexAttribArray(attrs.attrs.alpha.model2);
+				gl.enableVertexAttribArray(attrs.attrs.alpha.model3);
 				gl.enableVertexAttribArray(attrs.attrs.render_pos);
 				gl.enableVertexAttribArray(attrs.attrs.render_uv);
 				gl.enableVertexAttribArray(attrs.attrs.render_debug_pos);
@@ -552,30 +586,35 @@
 				gl.stencilFunc(gl.ALWAYS, 0, 0xff);
 				gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE);
 
-				gl.uniformMatrix4fv(attributes.uniforms.view, false, vm);
-				gl.uniformMatrix4fv(attributes.uniforms.proj, false, pm);
+				gl.useProgram(opaque_prog);
+
+				gl.uniformMatrix4fv(attributes.uniforms.opaque.view, false, vm);
+				gl.uniformMatrix4fv(attributes.uniforms.opaque.proj, false, pm);
 
 				gl.activeTexture(gl.TEXTURE0);
 				gl.bindTexture(gl.TEXTURE_2D, Tree.texture);
-				gl.uniform1i(attributes.uniforms.tex, 0);
+				gl.uniform1i(attributes.uniforms.opaque.tex, 0);
 
 				gl.bindBuffer(gl.ARRAY_BUFFER, buffers.vert);
-				gl.vertexAttribPointer(attributes.attrs.pos, 3, gl.FLOAT, false, 0, 0);
+				gl.vertexAttribPointer(attributes.attrs.opaque.pos, 3, gl.FLOAT, false, 0, 0);
 
 				gl.bindBuffer(gl.ARRAY_BUFFER, buffers.uv);
-				gl.vertexAttribPointer(attributes.attrs.uv, 2, gl.FLOAT, false, 0, 0);
+				gl.vertexAttribPointer(attributes.attrs.opaque.uv, 2, gl.FLOAT, false, 0, 0);
 
 				gl.bindBuffer(gl.ARRAY_BUFFER, buffers.model0);
-				gl.vertexAttribPointer(attributes.attrs.model0, 4, gl.FLOAT, false, 0, 0)
+				gl.vertexAttribPointer(attributes.attrs.opaque.model0, 4, gl.FLOAT, false, 0, 0)
 				gl.bindBuffer(gl.ARRAY_BUFFER, buffers.model1);
-				gl.vertexAttribPointer(attributes.attrs.model1, 4, gl.FLOAT, false, 0, 0)
+				gl.vertexAttribPointer(attributes.attrs.opaque.model1, 4, gl.FLOAT, false, 0, 0)
 				gl.bindBuffer(gl.ARRAY_BUFFER, buffers.model2);
-				gl.vertexAttribPointer(attributes.attrs.model2, 4, gl.FLOAT, false, 0, 0)
+				gl.vertexAttribPointer(attributes.attrs.opaque.model2, 4, gl.FLOAT, false, 0, 0)
 				gl.bindBuffer(gl.ARRAY_BUFFER, buffers.model3);
-				gl.vertexAttribPointer(attributes.attrs.model3, 4, gl.FLOAT, false, 0, 0)
+				gl.vertexAttribPointer(attributes.attrs.opaque.model3, 4, gl.FLOAT, false, 0, 0)
 
 				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.opaque_indices);
 				gl.drawElements(gl.TRIANGLES, buffers.opaque_indices.length, gl.UNSIGNED_SHORT, 0);
+
+				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.alpha_indices);
+				gl.drawElements(gl.TRIANGLES, buffers.alpha_indices.length, gl.UNSIGNED_SHORT, 0);
 
 				gl.depthMask(false);
 				gl.blendFuncSeparate(gl.ONE, gl.ONE, gl.ONE, gl.ONE);
@@ -587,6 +626,30 @@
 
 				gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR);
 				gl.stencilFunc(gl.ALWAYS, 0, 0xff);
+
+				gl.useProgram(alpha_prog);
+
+				gl.uniformMatrix4fv(attributes.uniforms.alpha.view, false, vm);
+				gl.uniformMatrix4fv(attributes.uniforms.alpha.proj, false, pm);
+
+				gl.activeTexture(gl.TEXTURE0);
+				gl.bindTexture(gl.TEXTURE_2D, Tree.texture);
+				gl.uniform1i(attributes.uniforms.alpha.tex, 0);
+
+				gl.bindBuffer(gl.ARRAY_BUFFER, buffers.vert);
+				gl.vertexAttribPointer(attributes.attrs.alpha.pos, 3, gl.FLOAT, false, 0, 0);
+
+				gl.bindBuffer(gl.ARRAY_BUFFER, buffers.uv);
+				gl.vertexAttribPointer(attributes.attrs.alpha.uv, 2, gl.FLOAT, false, 0, 0);
+
+				gl.bindBuffer(gl.ARRAY_BUFFER, buffers.model0);
+				gl.vertexAttribPointer(attributes.attrs.alpha.model0, 4, gl.FLOAT, false, 0, 0)
+				gl.bindBuffer(gl.ARRAY_BUFFER, buffers.model1);
+				gl.vertexAttribPointer(attributes.attrs.alpha.model1, 4, gl.FLOAT, false, 0, 0)
+				gl.bindBuffer(gl.ARRAY_BUFFER, buffers.model2);
+				gl.vertexAttribPointer(attributes.attrs.alpha.model2, 4, gl.FLOAT, false, 0, 0)
+				gl.bindBuffer(gl.ARRAY_BUFFER, buffers.model3);
+				gl.vertexAttribPointer(attributes.attrs.alpha.model3, 4, gl.FLOAT, false, 0, 0)
 
 				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.alpha_indices);
 				gl.drawElements(gl.TRIANGLES, buffers.alpha_indices.length, gl.UNSIGNED_SHORT, 0);
@@ -608,7 +671,6 @@
 
 				// now interpret all the avg_rgba values into the final texture, one pass per stencil
 
-				var orig_prog = gl.getParameter(gl.CURRENT_PROGRAM);
 				gl.useProgram(render_prog);
 
 				var render_posbuf = gl.createBuffer(), render_uvbuf = gl.createBuffer(),
@@ -698,8 +760,6 @@
 				gl.bindTexture(gl.TEXTURE_2D, textures.final_render);
 				gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 
-				gl.useProgram(orig_prog);
-
 				window.requestAnimationFrame(drawScene);
 
 				frames++;
@@ -710,7 +770,7 @@
 		<canvas id="glcanvas" width="800" height="600">
 		Your browser doesn't appear to support the HTML5 <code>&lt;canvas&gt;</code> element.
 		</canvas>
-		<p><span id="fps">???</span> FPS, <span id="debug"> </span></p>
+		<p><span id="fps">???</span> FPS, <span id="debug"></span></p>
 		<canvas id="texture" width="256" height="256">
 		</canvas>
 		<canvas id="texture2" width="1024" height="1024">
@@ -742,7 +802,7 @@
 				vUV = uv;
 			}
 		</script>
-		<script type="x-shader/x-fragment" id="frag-shader">
+		<script type="x-shader/x-fragment" id="frag-shader-opaque">
 			#version 100
 
 			varying lowp vec2 vUV;
@@ -751,6 +811,28 @@
 
 			void main(void) {
 				lowp vec4 color = texture2D(texture, vUV);
+
+				if (color.a < 1.0) {
+					discard;
+				}
+
+				gl_FragColor = color;
+			}
+		</script>
+		<script type="x-shader/x-fragment" id="frag-shader-alpha">
+			#version 100
+
+			varying lowp vec2 vUV;
+
+			uniform sampler2D texture;
+
+			void main(void) {
+				lowp vec4 color = texture2D(texture, vUV);
+
+				if (color.a == 1.0) {
+					discard;
+				}
+
 				gl_FragColor = vec4(color.rgb * color.a /* / 4.0 */, color.a);
 			}
 		</script>

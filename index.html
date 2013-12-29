@@ -7,7 +7,7 @@
 			var gl, fb_inter_opaque, fb_inter_alpha, fb_final, render_prog, render_debug_prog,
 			    render_stage2_prog;
 			var buffers = {}, attributes = {}, textures = {};
-			var vm, pm;
+			var vm, pm, camera_pitch = 0, camera_yaw = 0;
 
 			Array.prototype.foreach = function(fn, start, limit) {
 				if (start === undefined) start = 0;
@@ -386,6 +386,24 @@
 
 				gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
 
+				// set up pointerlock
+				canvas.requestPointerLock = canvas.requestPointerLock ||
+					canvas.mozRequestPointerLock ||
+					canvas.webkitRequestPointerLock;
+				if (canvas.requestPointerLock) {
+					document.addEventListener('pointerlockchange', pointerLockChanged, false);
+					document.addEventListener('mozpointerlockchange', pointerLockChanged, false);
+					document.addEventListener('webkitpointerlockchange', pointerLockChanged, false);
+					document.addEventListener('pointerlockerror', pointerLockError, false);
+					document.addEventListener('mozpointerlockerror', pointerLockError, false);
+					document.addEventListener('webkitpointerlockerror', pointerLockError, false);
+					canvas.addEventListener('click', function(e) {canvas.requestPointerLock();}, false);
+				} else {
+					// Hmm.  ...  ...Nope, no good way to have a fallback here.  :-/
+					alert('You won\'t be able to look around.  Probably want to use a ' +
+						'browser that supports requestPointerLock.  Good luck!');
+				}
+
 				// Do I really need this extra scope?  Eh, why not.
 				(function() {
 					var requestAnimationFrame = (window.requestAnimationFrame ||
@@ -397,19 +415,63 @@
 				window.requestAnimationFrame(drawScene);
 			}
 
-			var firsttimestamp = null;
+			function pointerLockError() {
+				alert('Error with pointer lock?  No idea why, since the API doesn\'t say...');
+			}
+
+			function pointerLockChanged() {
+				var canvas = document.getElementById('glcanvas'),
+				    ple = document.pointerLockElement ||
+					document.mozPointerLockElement ||
+					document.webkitPointerLockElement;
+
+				if (ple === canvas) {
+					canvas.addEventListener('mousemove', mouseMoved, false);
+				} else {
+					canvas.removeEventListener('mousemove', mouseMoved, false);
+				}
+			}
+
+			function mouseMoved(e) {
+				var dx = e.movementX || e.mozMovementX || e.webkitMovementX || 0,
+				    dy = e.movementY || e.mozMovementY || e.webkitMovementY || 0,
+				    rotation = mat4.create();
+
+				// The view matrix needs to be the inverse of a matrix that translates
+				// to the camera position, then rotates by yaw, then by pitch.  So do
+				// the operations in the other order, negate the angles, and negate the
+				// position vector.  Except that the angles both need to be inverted
+				// because of the axes that glmatrix rotates around (moving the mouse
+				// to the left should increase the angle but results in a negative dx;
+				// similarly for moving the mouse up and dy), so might as well leave
+				// both of them positive in both this calculation and the rotation
+				// below.
+				camera_yaw += 2 * Math.PI * dx / 1000;
+				camera_pitch += 2 * Math.PI * dy / 1000;
+
+				// clamp pitch; wrap yaw
+				if (camera_pitch > Math.PI / 2) {
+					camera_pitch = Math.PI / 2;
+				} else if (camera_pitch < -Math.PI / 2) {
+					camera_pitch = -Math.PI / 2;
+				}
+				if (camera_yaw > 2 * Math.PI) {
+					camera_yaw -= 2 * Math.PI;
+				} else if (camera_yaw < -2 * Math.PI) {
+					camera_yaw += 2 * Math.PI;
+				}
+
+				mat4.rotateX(rotation, rotation, camera_pitch);
+				mat4.rotateY(rotation, rotation, camera_yaw);
+				// TODO: put the actual camera position (negated) in here
+				mat4.translate(rotation, rotation, vec3.fromValues(0.0, -8.0, -70.0));
+				mat4.copy(vm, rotation);
+			}
+
 			var fpstimestamp = null;
 			var frames = 0;
 
 			function drawScene(timestamp) {
-				const SECONDS = 3;  // for a full revolution
-				const RADS_PER_SEC = 2*Math.PI / SECONDS;
-				if (firsttimestamp === null) {
-					firsttimestamp = timestamp;
-				}
-				if ((timestamp - firsttimestamp) > SECONDS*1000) {
-					firsttimestamp += SECONDS*1000;
-				}
 				if (fpstimestamp !== null) {
 					if (timestamp - fpstimestamp > 1000) {
 						document.getElementById('fps').firstChild.textContent = frames.toFixed(0);
@@ -432,11 +494,7 @@
 				gl.stencilFunc(gl.ALWAYS, 0, 0xff);
 				gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE);
 
-				// rotate around the scene once every few seconds
-				radians = ((timestamp - firsttimestamp) / 1000) * RADS_PER_SEC;
-				viewmatrix = mat4.create();
-				mat4.rotateY(viewmatrix, vm, radians);
-				gl.uniformMatrix4fv(attributes.uniforms.view, false, viewmatrix);
+				gl.uniformMatrix4fv(attributes.uniforms.view, false, vm);
 				gl.uniformMatrix4fv(attributes.uniforms.proj, false, pm);
 
 				gl.activeTexture(gl.TEXTURE0);
@@ -594,7 +652,7 @@
 		<canvas id="glcanvas" width="800" height="600">
 		Your browser doesn't appear to support the HTML5 <code>&lt;canvas&gt;</code> element.
 		</canvas>
-		<p><span id="fps">???</span> FPS, <span id="debug"></span></p>
+		<p><span id="fps">???</span> FPS, <span id="debug"> </span></p>
 		<canvas id="texture" width="256" height="256">
 		</canvas>
 		<canvas id="texture2" width="1024" height="1024">

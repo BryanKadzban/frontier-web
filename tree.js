@@ -825,13 +825,16 @@ Tree.Setup = function(gl, textures) {
 	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, TEXTURE_SIZE*4, TEXTURE_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, new_tex, 0);
 	var vp = gl.getParameter(gl.VIEWPORT), color = gl.getParameter(gl.COLOR_CLEAR_VALUE),
-	    blend = gl.getParameter(gl.BLEND);
+	    blend = gl.getParameter(gl.BLEND), blend_func_dst_rgb = gl.getParameter(gl.BLEND_DST_RGB),
+	    blend_func_dst_a = gl.getParameter(gl.BLEND_DST_ALPHA),
+	    blend_func_src_rgb = gl.getParameter(gl.BLEND_SRC_RGB),
+	    blend_func_src_a = gl.getParameter(gl.BLEND_SRC_ALPHA);
 	gl.viewport(0, 0, TEXTURE_SIZE*4, TEXTURE_SIZE);
 	gl.clearColor(0.0, 0.0, 0.0, 0.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
 
 	gl.enable(gl.BLEND);
-	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+	gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
 	gl.activeTexture(gl.TEXTURE1);
 	gl.bindTexture(gl.TEXTURE_2D, textures[0]);
@@ -874,7 +877,11 @@ Tree.Setup = function(gl, textures) {
 	gl.activeTexture(old_active_tex);
 	gl.bindTexture(gl.TEXTURE_2D, old_tex);
 	gl.useProgram(old_shader);
-	if (!blend) gl.disable(gl.BLEND);
+	if (!blend) {
+		gl.disable(gl.BLEND);
+	} else {
+		gl.blendFuncSeparate(blend_func_src_rgb, blend_func_dst_rgb, blend_func_src_a, blend_func_dst_a);
+	}
 
 	Tree.texture = new_tex;
 };

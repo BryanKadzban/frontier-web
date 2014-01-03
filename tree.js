@@ -635,7 +635,7 @@ Tree.drawLeafTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, line_p
 		var pos = vec3.fromValues(leaf.position[0], leaf.position[1], 0.0),
 		    rotation = mat3.create(),
 		    posTL = vec3.create(), posTR = vec3.create(), posBR = vec3.create(),
-		    posBL = vec3.create(), invpos = vec3.fromValues(-pos[0], -pos[1], -pos[2]);
+		    posBL = vec3.create(), invpos = vec3.negate(vec3.create(), pos);
 		mat3.translate(rotation, rotation, pos);
 		mat3.rotate(rotation, rotation, leaf.angle);
 		mat3.translate(rotation, rotation, invpos);

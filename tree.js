@@ -31,7 +31,8 @@ var LeafStyle = Object.freeze({
 
 // Convention: underscore-suffixed names are private
 
-// gl-matrix.js or gl-matrix-min.js must be evaluated before this file
+// gl-matrix.js or gl-matrix-min.js, plus random.js, must be evaluated before
+// this file, and an instance of Mersenne must be created at window.random.
 
 function Leaf(size, position, angle, color, dist, neighbor) {
 	this.size = size;
@@ -47,7 +48,7 @@ function Tree(tree_type, foliage_type, funnel, trunk_type, leaf_style, position)
 	this.foliage_type_ = foliage_type;
 	this.funnel_ = funnel;
 	this.trunk_type_ = trunk_type;
-	this.bend_freq_ = 1.0 + (Math.random()*2) + Math.random();
+	this.bend_freq_ = 1.0 + (random.random()*2) + random.random();
 	this.model_ = mat4.create();
 	this.leaf_style_ = leaf_style;
 	// Tree-building and object-placing code assumes positive Z is "up", but it's
@@ -532,8 +533,8 @@ Tree.drawLeafTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, line_p
 		// Now scatter other leaves around
 		for (var i = 0; i < 50; i++) {
 			delta = vec2.fromValues(
-				(Math.random() - 0.5) * (TEXTURE_SIZE - leaf_size),
-				(Math.random() - 0.5) * (TEXTURE_SIZE - leaf_size)
+				(random.random() - 0.5) * (TEXTURE_SIZE - leaf_size),
+				(random.random() - 0.5) * (TEXTURE_SIZE - leaf_size)
 			);
 			dist = vec2.length(delta);
 			vec2.add(pos, delta, vec2.fromValues(TEXTURE_SIZE / 2, TEXTURE_SIZE / 2));
@@ -568,7 +569,7 @@ Tree.drawLeafTexture_ = function(gl, posAttr, colorAttr, uvAttr, texAttr, line_p
 	}
 
 	leaves.foreach(function(leaf) {
-		vec4.lerp(leaf.color, leaf_color, vec4.fromValues(0, 0.5, 0, 1), Math.random() * 0.33);
+		vec4.lerp(leaf.color, leaf_color, vec4.fromValues(0, 0.5, 0, 1), random.random() * 0.33);
 	});
 
 	if (leaf_style == LeafStyle.SCATTER) {

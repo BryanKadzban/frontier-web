@@ -2,6 +2,7 @@
 <html>
 	<head>
 		<script src="gl-matrix-min.js"></script>
+		<script src="random.js"></script>
 		<script src="tree.js"></script>
 		<script>
 			var gl, fb_inter_opaque, fb_inter_alpha, fb_final,
@@ -9,6 +10,7 @@
 			var buffers = {}, attributes = {}, textures = {};
 			var vm, pm, camera_pitch = 0, camera_yaw = 0, camera_pos = vec3.fromValues(0.0, 8.0, 70.0);
 			var keystate = {};
+			var random = new Mersenne(1000);
 
 			Array.prototype.foreach = function(fn, start, limit) {
 				if (start === undefined) start = 0;
